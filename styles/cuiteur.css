@@ -74,6 +74,10 @@ header {
     position: relative;
 }
 
+header.deconnecte {
+    background: url(../images/entete_deconnecte.jpg) no-repeat;
+}
+
 /* Tous les éléments descendants de l'élément header sont positionnés en absolu.
  * Comme l'élément header est en positionnement relatif, cet élément header est le bloc conteneur 
  * de ses enfants.

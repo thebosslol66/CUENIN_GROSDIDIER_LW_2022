@@ -374,4 +374,18 @@ function em_aff_ligne_input(string $libelle, array $attributs = array(), string 
     echo '></td></tr>';
 }
 
+//____________________________________________________________________________
+/**
+ * Vérifie si la chaine passé en paramètre contient un tag html
+ *
+ * Vérifie si la chaine de caratère contient une balise html contenue
+ * dans des chevrons
+ *
+ * @param   string              $str    la chaine de caractère a vérifier
+ * @return  bool                Résultat de la requête
+ */
+
+function tcag_has_html_tag(string $str): bool {
+    return preg_match("/<[^<]+>/",$str,$m) != 0;
+  }
 ?>

@@ -41,6 +41,8 @@ define('LMAX_PASSWORD', 20);
 define('AGE_MIN', 18);
 define('AGE_MAX', 120);
 
+define('CUIT_PER_REQUEST', 4);
+
 
 //_______________________________________________________________
 /**
@@ -50,15 +52,15 @@ define('AGE_MAX', 120);
  */
 function em_aff_entete(?string $titre = null, bool $link=true):void{
     echo '<div id="bcContenu">',
-            '<header>';
+          $link ? '<header>' : '<header class="deconnecte">';
 	if ($link){
-    echo        '<a href="../index.html" title="Se déconnecter de cuiteur"></a>',
+    echo        '<a href="./deconnexion.php" title="Se déconnecter de cuiteur"></a>',
                 '<a href="../index.html" title="Ma page d\'accueil"></a>',
-                '<a href="../index.html" title="Rechercher des personnes à suivre"></a>';
-	}
-    echo        '<a href="../index.html" title="Modifier mes informations personnelles"></a>';
+                '<a href="../index.html" title="Rechercher des personnes à suivre"></a>',
+                '<a href="../index.html" title="Modifier mes informations personnelles"></a>';
+    }
     if ($titre === null){
-        echo    '<form action="../index.html" method="POST">',
+        echo    '<form action="" method="POST">',
                     '<textarea name="txtMessage"></textarea>',
                     '<input type="submit" name="btnPublier" value="" title="Publier mon message">',
                 '</form>';
@@ -80,20 +82,32 @@ function em_aff_infos(bool $connecte = true):void{
     if ($connecte){
         $bd = em_bd_connect();
 
-    $sql = 'SELECT ';
+    $sql = "SELECT 
+                usPseudo,
+                usAvecPhoto,
+                usNom,
+                (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$_SESSION['usID']}) AS blabla,
+                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$_SESSION['usID']}) AS abos,
+                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$_SESSION['usID']}) AS abos2
+            FROM users
+            WHERE usID = {$_SESSION['usID']}";
 
     $res = em_bd_send_request($bd, $sql);
-
+    $t = mysqli_fetch_assoc($res);
         echo
             '<h3>Utilisateur</h3>',
             '<ul>',
-                '<li>',
-                    '<img src="../images/pdac.jpg" alt="photo de l\'utilisateur">',
-                    '<a href="../index.html" title="Voir mes infos">pdac</a> Pierre Dac',
+                '<li>';
+                if ($t['usAvecPhoto'] == 1) {
+                    echo '<img src="../images/',$t['usPseudo'],'.jpg" alt="photo de l\'utilisateur">';
+                } else {
+                    echo '<img src="../images/anonyme.jpg" alt="photo de l\'utilisateur">';
+                }
+        echo    '<a href="../index.html" title="Voir mes infos">',$t['usPseudo'],'</a> ',$t['usNom'],
                 '</li>',
-                '<li><a href="../index.html" title="Voir la liste de mes messages">100 blablas</a></li>',
-                '<li><a href="../index.html" title="Voir les personnes que je suis">123 abonnements</a></li>',
-                '<li><a href="../index.html" title="Voir les personnes qui me suivent">34 abonnés</a></li>',                 
+                '<li><a href="../index.html" title="Voir la liste de mes messages">',$t['blabla'],' blablas</a></li>',
+                '<li><a href="../index.html" title="Voir les personnes que je suis">',$t['abos'],' abonnements</a></li>',
+                '<li><a href="../index.html" title="Voir les personnes qui me suivent">',$t['abos2'],' abonnés</a></li>',    
             '</ul>',
             '<h3>Tendances</h3>',
             '<ul>',
@@ -115,12 +129,13 @@ function em_aff_infos(bool $connecte = true):void{
                 '</li>',
                 '<li><a href="../index.html">Plus de suggestions</a></li>',
             '</ul>';
-    }
+            // libération des ressources
+            mysqli_free_result($res);
+            mysqli_close($bd);
+        }
     echo '</aside>',
          '<main>';   
-    // libération des ressources
-    mysqli_free_result($res);
-    mysqli_close($bd);
+
 }
 
 //_______________________________________________________________
@@ -153,7 +168,16 @@ function em_aff_pied(): void{
 * @param mysqli_result  $r       Objet permettant l'accès aux résultats de la requête SELECT
 */
 function em_aff_blablas(mysqli_result $r): void {
-    while ($t = mysqli_fetch_assoc($r)) {
+    if (!isset($_GET['page'])){
+        $_GET['page'] = 1;
+    }
+    else if($_GET['page'] < 1){
+        $_GET['page'] = 1;
+    }
+    
+    $compteur = 0;
+    $maxCuit = $_GET['page'] * CUIT_PER_REQUEST;
+    while (($t = mysqli_fetch_assoc($r)) && $compteur < $maxCuit) {
         if ($t['oriID'] === null){
             $id_orig = $t['autID'];
             $pseudo_orig = $t['autPseudo'];
@@ -177,8 +201,20 @@ function em_aff_blablas(mysqli_result $r): void {
                     '<br>',
                     em_html_proteger_sortie($t['blTexte']),
                     '<p class="finMessage">',
-                    em_amj_clair($t['blDate']), ' à ', em_heure_clair($t['blHeure']),
-                    '<a href="../index.html">Répondre</a> <a href="../index.html">Recuiter</a></p>',
+                    em_amj_clair($t['blDate']), ' à ', em_heure_clair($t['blHeure']);
+                    if ($t['autID'] == $_SESSION['usID']) {
+                        echo '<a href="../index.html">Supprimer</a>';
+                    } else  {
+                        echo '<a href="../index.html">Répondre</a> <a href="../index.html">Recuiter</a></p>';
+                    }
+                    
+                echo '</li>';
+        $compteur++;
+    }
+    if ($compteur < mysqli_num_rows($r)){
+        echo    '<li class="plusBlablas">',
+                    '<a href="?page=', $_GET['page']+1, '"><strong>Plus de blablas</strong></a>',
+                    '<img src="../images/speaker.png" width="75" height="82" alt="Image du speaker \'Plus de blablas\'">',
                 '</li>';
     }
 }
@@ -303,5 +339,16 @@ function em_verification_connection(string $pseudo, string $password, string $ta
     // redirection vers la page protegee.php
     header('Location: '.$target);
     exit();
+}
+
+
+function get_users_mentionned(string $text): array {
+    preg_match_all('/@([[:alpha:]]+)/',$text,$matches, PREG_SET_ORDER, 0);
+    return array_column($matches, 1);
+}
+
+function get_tags_mentionned(string $text): array {
+    preg_match_all('/#([[:alpha:]]+)/',$text,$matches, PREG_SET_ORDER, 0);
+    return array_column($matches, 1);
 }
 ?>

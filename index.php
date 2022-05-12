@@ -30,7 +30,7 @@ $er = isset($_POST['btnSInscrire']) ? eml_traitement_inscription() : array();
 
 em_aff_debut('Cuiteur | Connectez-vous', 'styles/cuiteur.css');
 
-em_aff_entete('Connectez-vous');
+em_aff_entete('Connectez-vous', false);
 em_aff_infos(false);
 
 eml_aff_formulaire($er);
@@ -99,5 +99,5 @@ function eml_traitement_inscription(): array {
         $val = trim($val);
     }
 
-	return em_verification_connection($_POST["pseudo"], $_POST["passe"], 'php/cuiteur_1.php');
+	return em_verification_connection($_POST["pseudo"], $_POST["passe"], 'php/cuiteur.php');
 }

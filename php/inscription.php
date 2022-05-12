@@ -30,7 +30,7 @@ $er = isset($_POST['btnSInscrire']) ? eml_traitement_inscription() : array();
 
 em_aff_debut('Cuiteur | Inscription', '../styles/cuiteur.css');
 
-em_aff_entete('Inscription');
+em_aff_entete('Inscription',false);
 em_aff_infos(false);
 
 eml_aff_formulaire($er);
