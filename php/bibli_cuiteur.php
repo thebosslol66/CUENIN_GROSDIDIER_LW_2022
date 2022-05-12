@@ -78,6 +78,12 @@ function em_aff_entete(?string $titre = null, bool $link=true):void{
 function em_aff_infos(bool $connecte = true):void{
     echo '<aside>';
     if ($connecte){
+        $bd = em_bd_connect();
+
+    $sql = 'SELECT ';
+
+    $res = em_bd_send_request($bd, $sql);
+
         echo
             '<h3>Utilisateur</h3>',
             '<ul>',
@@ -112,6 +118,9 @@ function em_aff_infos(bool $connecte = true):void{
     }
     echo '</aside>',
          '<main>';   
+    // libération des ressources
+    mysqli_free_result($res);
+    mysqli_close($bd);
 }
 
 //_______________________________________________________________
