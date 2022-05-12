@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Cuiteur</title>
+    <link rel="stylesheet" href="../styles/inscription.css" type="text/css">
+    <link rel="shortcut icon" href="../images/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+<main>
+    <header>
+        <a href="../index.html" title="Se déconnecter de cuiteur"></a>
+        <a href="../index.html" title="Ma page d'accueil"></a>
+        <a href="../index.html" title="Rechercher des personnes à suivre"></a>
+        <a href="../index.html" title="Modifier mes informations personnelles"></a> 
+
+        <h1>Inscription</h1>
+    </header>
+    
+  <aside></aside>
+  <form action="../php/inscription_1.php" method="post">       
+  <table>
+    <h2>Pour vous inscrire, merci de fournir les informations suivantes.</h2>
+        <fieldset>
+        <tr>
+          <td><label for="pseudo">Votre pseudo :</label></td>
+          <td><input class="form_txt" name="pseudo" placeholder="Minimum 4 caractères alphanumériques" autofocus="" minlength="4" required=""></td>
+        </tr>
+        <tr>
+          <td><label for="passe1">Votre mot de passe :</label></td>
+          <td><input class="form_txt" name="passe1" type="password" required=""></td>
+        </tr>
+        <tr>
+          <td><label for="passe2">Répétez le mot de passe :</label></td>
+          <td><input class="form_txt" name="passe2" type="password" required=""></td>
+        </tr>
+          <td><label for="nomprenom">Nom et prénom :</label></td>
+          <td><input class="form_txt" name="nomprenom" required=""></td>
+        <tr>
+          <td><label for="email">Votre adresse email :</label></td>
+          <td><input class="form_txt" name="email" type="email" required=""></td>
+        </tr>
+        <tr>
+          <td><label for="naissance">Votre date de naissance :</label></td>
+          <td><input name="naissance" type="date" required=""></td>
+        </tr>
+          </fieldset>
+      </table>
+    
+    <p><input type="submit" value="Soummettre"><input type="reset" value="Réinitialiser"></p>
+  </form>
+
+    <footer>
+        <a href="../index.html">A propos</a>
+        <a href="../index.html">Publicité</a>
+        <a href="../index.html">Patati</a>
+        <a href="../index.html">Aide</a>
+        <a href="../index.html">Patata</a>
+        <a href="../index.html">Stages</a>
+        <a href="../index.html">Emplois</a>
+        <a href="../index.html">Confidentialité</a>
+    </footer>
+</main>
+</body>
+</html>
