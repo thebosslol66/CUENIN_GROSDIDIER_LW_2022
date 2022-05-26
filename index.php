@@ -17,7 +17,7 @@ require_once 'php/bibli_cuiteur.php';
 
 // si utilisateur déjà authentifié, on le redirige vers la page cuiteur_1.php
 if (em_est_authentifie()){
-    header('Location: php/cuiteur_1.php');
+    header('Location: php/cuiteur.php');
     exit();
 }
 

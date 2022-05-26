@@ -18,9 +18,11 @@ if (isset($_POST['btnPublier'])){
     if (!isset($_POST['txtMessage']) || empty($_POST['txtMessage'])){
         //gestion de empty
     }
+    
     if (tcag_has_html_tag($_POST['txtMessage'])){
         //gestion erreur
     }
+
     $users_mentioned = get_users_mentionned($_POST['txtMessage']);
     $tags_mentioned = get_tags_mentionned($_POST['txtMessage']);
     $text = em_bd_proteger_entree($bd, $_POST['txtMessage']);
@@ -30,25 +32,99 @@ if (isset($_POST['btnPublier'])){
 
     $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`) 
         VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$text."')";
-    $reqSql .= "\nDECLARE @LASTID AS INTEGER(100) = SCOPE_IDENTITY()";
-    if (count($tags_mentioned)>0){
-        $reqSql .= "\nINSERT INTO `tags`(`taID`, `taIDBlabla`) VALUES "; 
+    $res = em_bd_send_request($bd, $reqSql);
+    if ($res){
+        $idmess = mysqli_insert_id($bd);
+        $reqSql = "" ;
+        if (count($tags_mentioned)>0){
+            $reqSql .= "INSERT INTO `tags`(`taID`, `taIDBlabla`) VALUES "; 
+            foreach($tags_mentioned as $tag){
+                $reqSql .= "\n ('".$tag."', '".$idmess."'),";
+            }
+            $reqSql = rtrim($reqSql, ",");
+            $res = em_bd_send_request($bd, $reqSql);
+        }
+        
+        if (count($users_mentioned)>0){
+            $reqSql = "INSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
+            foreach($users_mentioned as $user){
+                $reqSql .= "\n ((SELECT usID FROM users WHERE usPseudo = '".$user."'), '".$idmess."'),";
+            }
+            $reqSql = rtrim($reqSql, ",");
+            $res = em_bd_send_request($bd, $reqSql);
+        }
     }
-    foreach($tags_mentioned as $tag){
-        $reqSql .= "\n ('".$tag."', '@LASTID')";
-    }
-    if (count($users_mentioned)>0){
-        $reqSql .= "\nINSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
-    }
-    foreach($users_mentioned as $user){
-        $reqSql .= "\n ((SELECT usID FROM users WHERE usPseudo = '".$user."'), '@LASTID')";
-    }
+}
 
-    var_dump($reqSql);
+if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
+    if ($_POST['blaction'] == 'delete'){
+        $req = "SELECT *
+                FROM `blablas`
+                WHERE `blIDAuteur` = ".$_SESSION['usID']. "
+                AND `blID` = ".$_POST["blablaId"];
+        $res = em_bd_send_request($bd, $req);
+        if (mysqli_num_rows($res) > 0){
+            mysqli_free_result($res);
+            $req = "DELETE
+                    FROM `mentions`
+                    WHERE `meIDBlabla` = ".$_POST["blablaId"];
+            $res = em_bd_send_request($bd, $req); 
+            $req = "DELETE
+                    FROM `tags`
+                    WHERE `taIDBlabla` = ".$_POST["blablaId"];
+            $res = em_bd_send_request($bd, $req); 
+            $req = "DELETE
+                    FROM `blablas`
+                    WHERE `blID` = ".$_POST["blablaId"];
+            $res = em_bd_send_request($bd, $req); 
+        }
+    }
+    if ($_POST['blaction'] == 'response'){
+    }
+    if ($_POST['blaction'] == 'recuit'){
+        $req = "SELECT *
+                FROM `blablas`
+                WHERE `blID` = ".$_POST["blablaId"];
+        $res = em_bd_send_request($bd, $req);
+        if (mysqli_num_rows($res) > 0){
+            $t = mysqli_fetch_assoc($res);
+            $users_mentioned = get_users_mentionned($t["blTexte"]);
+            $tags_mentioned = get_tags_mentionned($t["blTexte"]);
+            $origAuthor = $t["bliIDAutOrig"] ? $t["bliIDAutOrig"] : $t["bliIDAuteur"];
+            $date_cuit = date('Ymd');
+            $heure_cuit = date('h:m:s');
+            $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`, `blIDAutOrig`) 
+                       VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$t["blTexte"]."', '".$origAuthor."')";
+            mysqli_free_result($res);
+            $res = em_bd_send_request($bd, $reqSql);
+            if ($res){
+                $idmess = mysqli_insert_id($bd);
+                $reqSql = "" ;
+                if (count($tags_mentioned)>0){
+                    $reqSql .= "INSERT INTO `tags`(`taID`, `taIDBlabla`) VALUES "; 
+                    foreach($tags_mentioned as $tag){
+                        $reqSql .= "\n ('".$tag."', '".$idmess."'),";
+                    }
+                    $reqSql = rtrim($reqSql, ",");
+                    $res = em_bd_send_request($bd, $reqSql);
+                }
+                
+                if (count($users_mentioned)>0){
+                    $reqSql = "INSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
+                    foreach($users_mentioned as $user){
+                        $reqSql .= "\n ((SELECT usID FROM users WHERE usPseudo = '".$user."'), '".$idmess."'),";
+                    }
+                    $reqSql = rtrim($reqSql, ",");
+                    $res = em_bd_send_request($bd, $reqSql);
+                }
+            }
+        }
+    }
 }
 
 $sql = '
 (   SELECT 
+        blID,
         blTexte, 
         blDate, 
         blHeure,
@@ -66,6 +142,7 @@ $sql = '
 	WHERE users.usID = '.$_SESSION['usID'].'
 UNION
 	SELECT
+        blID,
         blTexte, 
         blDate, 
         blHeure,
@@ -78,12 +155,13 @@ UNION
         users2.usNom AS usNom2, 
         users2.usAvecPhoto AS usAvecPhoto2
 	FROM 
-        ((users INNER JOIN estabonne ON users.usID = eaIDAbonne) 
+        ((users INNER JOIN estabonne ON users.usID = eaIDUser) 
             INNER JOIN blablas ON users.usID = blIDAuteur)
             LEFT OUTER JOIN `users` AS users2 ON `blIDAutOrig` = users2.usID
-	WHERE eaIDUser = '.$_SESSION['usID'].'
+	WHERE eaIDAbonne = '.$_SESSION['usID'].'
 UNION
-	SELECT 
+	SELECT
+        blID,
         blTexte, 
         blDate, 
         blHeure,

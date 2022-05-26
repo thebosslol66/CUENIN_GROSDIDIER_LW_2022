@@ -254,7 +254,7 @@ main li:not(.plusBlablas) {
 .finMessage a:hover {
     opacity: 1;
 }
-    
+
 main li.plusBlablas {
     text-align: right;
 }
@@ -331,6 +331,16 @@ main input[type="submit"]:hover, main input[type="reset"]:hover {
     background: rgba(255, 255, 255, 0.6);
 }
 
+.noterror{
+    border: solid 2px #0A0;
+    border-radius: 5px;
+    color: #0A0;
+    font-weight: bold;
+    padding: 5px;
+    margin: 10px;
+    background: rgba(255, 255, 255, 0.6);
+}
+
 /* ---------------------------------------------------------------
     BLOC PIED DE PAGE
 --------------------------------------------------------------- */
@@ -350,4 +360,59 @@ footer a {
     
 footer a:hover {
     opacity: 1;
+}
+
+/* ---------------------------------------------------------------
+    BLOC Recherche et abonement
+--------------------------------------------------------------- */
+
+h2 {
+    font-size: 20px;
+    font-weight: bold;
+    padding: 20px 0 0 0;
+}
+
+h2 + hr {
+    margin-top: 0px;
+    margin-bottom: 20px;
+    border-width: 2px;
+}
+
+.abonement-checkbox {
+    margin-top: 5px;
+    font-size: 15px;
+    min-height: 20px;
+    text-align: end;
+    font-weight: bold;
+}
+
+.abonement-checkbox > input[type="checkbox"]{
+    position: relative;
+    top: 1px;
+}
+
+/* ---------------------------------------------------------------
+    BLOC UTILISATEURS
+--------------------------------------------------------------- */
+
+div.user-infos {
+    margin: 0 0 25px 50px;
+    padding: 5px 5px 15px 12px;
+}
+
+table.user-infos {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse:separate;
+}
+
+table.user-infos td:first-child {
+    width: 30%;
+    padding-right: 10px;
+    text-align: right;
+}
+
+table.user-infos tr:not(:last-child) td:last-child {
+    display: inline-block;
+    vertical-align: middle;
 }

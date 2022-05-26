@@ -55,9 +55,9 @@ function em_aff_entete(?string $titre = null, bool $link=true):void{
           $link ? '<header>' : '<header class="deconnecte">';
 	if ($link){
     echo        '<a href="./deconnexion.php" title="Se déconnecter de cuiteur"></a>',
-                '<a href="../index.html" title="Ma page d\'accueil"></a>',
-                '<a href="../index.html" title="Rechercher des personnes à suivre"></a>',
-                '<a href="../index.html" title="Modifier mes informations personnelles"></a>';
+                '<a href="../index.php" title="Ma page d\'accueil"></a>',
+                '<a href="./recherche.php" title="Rechercher des personnes à suivre"></a>',
+                '<a href="./compte.php" title="Modifier mes informations personnelles"></a>';
     }
     if ($titre === null){
         echo    '<form action="" method="POST">',
@@ -83,17 +83,23 @@ function em_aff_infos(bool $connecte = true):void{
         $bd = em_bd_connect();
 
     $sql = "SELECT 
+                usId,
                 usPseudo,
                 usAvecPhoto,
                 usNom,
-                (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$_SESSION['usID']}) AS blabla,
-                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$_SESSION['usID']}) AS abos,
-                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$_SESSION['usID']}) AS abos2
+                (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$_SESSION['usID']}) AS nbBlabla,
+                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$_SESSION['usID']}) AS nbAbos,
+                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$_SESSION['usID']}) AS nbAbos2
             FROM users
             WHERE usID = {$_SESSION['usID']}";
 
     $res = em_bd_send_request($bd, $sql);
     $t = mysqli_fetch_assoc($res);
+
+    $blabla = $t['nbBlabla'] <= 1 ? "blabla": "blablas";
+    $abonnement = $t['nbAbos'] <= 1 ? "abonné": "abonnés";
+    $abonne = $t['nbAbos2'] <= 1 ? "abonement": "abonements";
+
         echo
             '<h3>Utilisateur</h3>',
             '<ul>',
@@ -103,11 +109,12 @@ function em_aff_infos(bool $connecte = true):void{
                 } else {
                     echo '<img src="../images/anonyme.jpg" alt="photo de l\'utilisateur">';
                 }
-        echo    '<a href="../index.html" title="Voir mes infos">',$t['usPseudo'],'</a> ',$t['usNom'],
+        echo    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($t['usPseudo']).'</strong>','user', $t['usId'], 'Voir mes infos'),
+                ' ', '<strong>', em_html_proteger_sortie($t['usNom']), '</strong>',
                 '</li>',
-                '<li><a href="../index.html" title="Voir la liste de mes messages">',$t['blabla'],' blablas</a></li>',
-                '<li><a href="../index.html" title="Voir les personnes que je suis">',$t['abos'],' abonnements</a></li>',
-                '<li><a href="../index.html" title="Voir les personnes qui me suivent">',$t['abos2'],' abonnés</a></li>',    
+                '<li>', em_html_a('blablas.php', "{$t['nbBlabla']} ".$blabla, 'user', $t['usId'], "Afficher les blablas de {$t['usPseudo']}"), '</li>',
+                '<li>', em_html_a('abonnes.php', "{$t['nbAbos2']} ".$abonne, 'user', $t['usId'], "Afficher les abonés de {$t['usPseudo']}"),'</li>',
+                '<li>', em_html_a('abonnements.php', "{$t['nbAbos']} ".$abonnement, 'user', $t['usId'], "Afficher les abonements de {$t['usPseudo']}"),'</li>',    
             '</ul>',
             '<h3>Tendances</h3>',
             '<ul>',
@@ -193,22 +200,40 @@ function em_aff_blablas(mysqli_result $r): void {
         echo    '<li>', 
                     '<img src="../', ($photo == 1 ? "upload/$id_orig.jpg" : 'images/anonyme.jpg'), 
                     '" class="imgAuteur" alt="photo de l\'auteur">',
-                    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($pseudo_orig).'</strong>','id', $id_orig, 'Voir mes infos'), 
+                    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($pseudo_orig).'</strong>','user', $id_orig, 'Voir mes infos'), 
                     ' ', em_html_proteger_sortie($nom_orig),
                     ($t['oriID'] !== null ? ', recuité par '
                                             .em_html_a( 'utilisateur.php','<strong>'.em_html_proteger_sortie($t['autPseudo']).'</strong>',
                                                         'id', $t['autID'], 'Voir mes infos') : ''),
-                    '<br>',
-                    em_html_proteger_sortie($t['blTexte']),
-                    '<p class="finMessage">',
+                    '<br>';
+
+                    $output = em_html_proteger_sortie($t['blTexte']);
+                    $output = ag_active_mention_and_tags($output);
+                    echo $output;
+
+                    echo '<p class="finMessage">',
                     em_amj_clair($t['blDate']), ' à ', em_heure_clair($t['blHeure']);
                     if ($t['autID'] == $_SESSION['usID']) {
-                        echo '<a href="../index.html">Supprimer</a>';
+                        echo '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'-del\').submit();">Supprimer</a>';
                     } else  {
-                        echo '<a href="../index.html">Répondre</a> <a href="../index.html">Recuiter</a></p>';
+                        echo 
+                    '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'-rep\').submit();">Répondre</a>',
+                    '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'rec\').submit();">Recuiter</a>';
                     }
-                    
-                echo '</li>';
+                    echo 
+                    '<form method="POST" id="cuit-',  $t['blID'], '-del">',
+                        '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
+                        '<input type="hidden" id="blaction" name="blaction" value="delete">',
+                    '</form>',
+                    '<form method="POST" id="cuit-',  $t['blID'], '-rep">',
+                        '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
+                        '<input type="hidden" id="blaction" name="blaction" value="response">',
+                    '</form>',
+                    '<form method="POST" id="cuit-',  $t['blID'], '-rec">',
+                        '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
+                        '<input type="hidden" id="blaction" name="blaction" value="recuit">',
+                    '</form>',
+                '</li>';
         $compteur++;
     }
     if ($compteur < mysqli_num_rows($r)){
@@ -343,12 +368,36 @@ function em_verification_connection(string $pseudo, string $password, string $ta
 
 
 function get_users_mentionned(string $text): array {
-    preg_match_all('/@([[:alpha:]]+)/',$text,$matches, PREG_SET_ORDER, 0);
+    preg_match_all('/@([a-zA-Z0-9]+)/',$text,$matches, PREG_SET_ORDER, 0);
     return array_column($matches, 1);
 }
 
 function get_tags_mentionned(string $text): array {
-    preg_match_all('/#([[:alpha:]]+)/',$text,$matches, PREG_SET_ORDER, 0);
+    preg_match_all('/#([a-zA-Z0-9éâîôùèçàïû]+)/',$text,$matches, PREG_SET_ORDER, 0);
     return array_column($matches, 1);
+}
+
+function ag_active_mention_and_tags(string $cuit): string {
+    $cuit = html_entity_decode($cuit, ENT_NOQUOTES, "UTF-8");
+    $t = preg_replace("/(?<=([^&]))#([a-zA-Z0-9éâîôùèçàïû]+)/m", "<a class=\"tag\" href=\"tendances.php?tag=$2\">#$2</a>", $cuit);
+    $t = preg_replace("/(?<=([^&]))@([a-zA-Z0-9]+)[$]?/", "<a class=\"peopleCite\" href=\"utilisateur.php?pseudo=$2\">@$2</a>", $t);
+    return $t;
+}
+
+
+function tcag_aff_user_infos(array $infos){
+    $blabla = $infos['nbBlabla'] <= 1 ? "blabla": "blablas";
+    $mention = $infos['nbMention'] <= 1 ? "mention": "mentions";
+    $abonnement = $infos['nbAbos'] <= 1 ? "abonné": "abonnés";
+    $abonne = $infos['nbAbos2'] <= 1 ? "abonement": "abonements";
+    echo    '<img src="../', ($infos['usAvecPhoto'] == 1 ? "upload/{$infos['usId']}.jpg" : 'images/anonyme.jpg'), 
+            '" class="imgAuteur" alt="photo de l\'auteur">',
+            em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($infos['usPseudo']).'</strong>','user', $infos['usId'], 'Voir mes infos'), 
+            ' ', '<strong>', em_html_proteger_sortie($infos['usNom']), '</strong>',
+            '<br>',
+            em_html_a('blablas.php', "{$infos['nbBlabla']} ".$blabla, 'user', $infos['usId'], "Afficher les blablas de {$infos['usPseudo']}"), ' - ',
+            em_html_a('mentions.php', "{$infos['nbMention']} ".$mention, 'user', $infos['usId'], "Afficher les mentions de {$infos['usPseudo']}"), ' - ',
+            em_html_a('abonnes.php', "{$infos['nbAbos2']} ".$abonne, 'user', $infos['usId'], "Afficher les abonés de {$infos['usPseudo']}"), ' - ',
+            em_html_a('abonnements.php', "{$infos['nbAbos']} ".$abonnement, 'user', $infos['usId'], "Afficher les abonements de {$infos['usPseudo']}");
 }
 ?>
