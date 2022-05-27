@@ -28,7 +28,7 @@ if (isset($_POST['btnPublier'])){
     $text = em_bd_proteger_entree($bd, $_POST['txtMessage']);
     
     $date_cuit = date('Ymd');
-    $heure_cuit = date('h:m:s');
+    $heure_cuit = date('h:i:s');
 
     $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`) 
         VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$text."')";
@@ -42,19 +42,24 @@ if (isset($_POST['btnPublier'])){
                 $reqSql .= "\n ('".$tag."', '".$idmess."'),";
             }
             $reqSql = rtrim($reqSql, ",");
+            $reqSql .= ";";
             $res = em_bd_send_request($bd, $reqSql);
         }
         
         if (count($users_mentioned)>0){
             $reqSql = "INSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
             foreach($users_mentioned as $user){
-                $reqSql .= "\n ((SELECT usID FROM users WHERE usPseudo = '".$user."'), '".$idmess."'),";
+                $reqSql .= "\n ((SELECT `usID` FROM `users` WHERE `usPseudo` = '".$user."'), '".$idmess."'),";
             }
             $reqSql = rtrim($reqSql, ",");
+            $reqSql .= ";";
             $res = em_bd_send_request($bd, $reqSql);
         }
+        
     }
 }
+
+$prefill_responce = "";
 
 if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
     if ($_POST['blaction'] == 'delete'){
@@ -63,23 +68,29 @@ if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
                 WHERE `blIDAuteur` = ".$_SESSION['usID']. "
                 AND `blID` = ".$_POST["blablaId"];
         $res = em_bd_send_request($bd, $req);
+        $req = "";
         if (mysqli_num_rows($res) > 0){
             mysqli_free_result($res);
             $req = "DELETE
-                    FROM `mentions`
-                    WHERE `meIDBlabla` = ".$_POST["blablaId"];
-            $res = em_bd_send_request($bd, $req); 
-            $req = "DELETE
-                    FROM `tags`
-                    WHERE `taIDBlabla` = ".$_POST["blablaId"];
-            $res = em_bd_send_request($bd, $req); 
-            $req = "DELETE
-                    FROM `blablas`
-                    WHERE `blID` = ".$_POST["blablaId"];
-            $res = em_bd_send_request($bd, $req); 
+                        FROM `mentions`
+                        WHERE `meIDBlabla` = {$_POST["blablaId"]};";
+                        $res = em_bd_send_request($bd, $req);
+                   $req =  "DELETE
+                        FROM `tags`
+                        WHERE `taIDBlabla` = {$_POST["blablaId"]};";
+                        $res = em_bd_send_request($bd, $req);
+                    $req = "DELETE
+                        FROM `blablas`
+                        WHERE `blID` = {$_POST["blablaId"]};"; 
+                        $res = em_bd_send_request($bd, $req);
+        } else {
+            mysqli_free_result($res);
         }
+        $res = em_bd_send_request($bd, $req);
+        
     }
-    if ($_POST['blaction'] == 'response'){
+    if ($_POST['blaction'] == 'response' && !empty($_POST['authorName'])){
+        $prefill_responce = '@'.$_POST['authorName'];
     }
     if ($_POST['blaction'] == 'recuit'){
         $req = "SELECT *
@@ -90,11 +101,11 @@ if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
             $t = mysqli_fetch_assoc($res);
             $users_mentioned = get_users_mentionned($t["blTexte"]);
             $tags_mentioned = get_tags_mentionned($t["blTexte"]);
-            $origAuthor = $t["bliIDAutOrig"] ? $t["bliIDAutOrig"] : $t["bliIDAuteur"];
+            $origAuthor = $t["blIDAutOrig"] ? $t["blIDAutOrig"] : $t["blIDAuteur"];
             $date_cuit = date('Ymd');
             $heure_cuit = date('h:m:s');
             $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`, `blIDAutOrig`) 
-                       VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$t["blTexte"]."', '".$origAuthor."')";
+                       VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".em_bd_proteger_entree($bd, $t["blTexte"])."', '".$origAuthor."')";
             mysqli_free_result($res);
             $res = em_bd_send_request($bd, $reqSql);
             if ($res){
@@ -121,6 +132,7 @@ if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
         }
     }
 }
+
 
 $sql = '
 (   SELECT 
@@ -155,10 +167,10 @@ UNION
         users2.usNom AS usNom2, 
         users2.usAvecPhoto AS usAvecPhoto2
 	FROM 
-        ((users INNER JOIN estabonne ON users.usID = eaIDUser) 
+        ((users INNER JOIN estabonne ON users.usID = eaIDAbonne) 
             INNER JOIN blablas ON users.usID = blIDAuteur)
             LEFT OUTER JOIN `users` AS users2 ON `blIDAutOrig` = users2.usID
-	WHERE eaIDAbonne = '.$_SESSION['usID'].'
+	WHERE eaIDUser = '.$_SESSION['usID'].'
 UNION
 	SELECT
         blID,
@@ -183,8 +195,9 @@ ORDER BY blDate DESC, blHeure DESC';
 
 $res = em_bd_send_request($bd, $sql);
 
+
 em_aff_debut('Cuiteur', '../styles/cuiteur.css');
-em_aff_entete();
+em_aff_entete(NULL, true, $prefill_responce);
 em_aff_infos();
 echo '<ul>';
 

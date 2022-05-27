@@ -31,7 +31,7 @@ $bd = em_bd_connect();
 if (!empty($_POST['btnDesabonner'])){
     if (!empty($_POST['usId']) && $_POST['usId'] != $_SESSION['usID']){
         $eaIDUser = em_bd_proteger_entree($bd, $_POST['usId']);
-        $sql = "DELETE FROM `estabonne` WHERE (eaIDUser = {$eaIDUser} AND eaIDAbonne = {$_SESSION['usID']})";
+        $sql = "DELETE FROM `estabonne` WHERE (eaIDUser = {$_SESSION['usID']} AND eaIDAbonne = {$eaIDUser})";
         em_bd_send_request($bd, $sql);
     }
     mysqli_close($bd);
@@ -41,17 +41,42 @@ if (!empty($_POST["btnAbonner"])){
     if (!empty($_POST['usId']) && $_POST['usId'] != $_SESSION['usID']){
         $date_abonnement = date('Ymd');
         $eaIDUser = em_bd_proteger_entree($bd, $_POST['usId']);
-        $sql = "INSERT INTO `estabonne`(`eaIDUser`, `eaIDAbonne`, `eaDate`) VALUES ('{$eaIDUser}', '{$_SESSION['usID']}', '$date_abonnement')";
+        $sql = "INSERT INTO `estabonne`(`eaIDUser`, `eaIDAbonne`, `eaDate`) VALUES ('{$_SESSION['usID']}', '{$eaIDUser}', '$date_abonnement')";
         em_bd_send_request($bd, $sql);
     }
     mysqli_close($bd);
     header('Location: ./cuiteur.php');
 }
 
-if (empty($_GET["user"]))
-    $idUser = $_SESSION['usID'];
-else
+if (!empty($_GET["user"]))
     $idUser = $_GET["user"];
+elseif(!empty($_GET["pseudo"])){
+    $idUser = $_GET["pseudo"];
+    $sql = "SELECT usId FROM `users` WHERE `usPseudo` = '{$_GET["pseudo"]}'";
+    $res = em_bd_send_request($bd, $sql);
+    if (mysqli_num_rows($res) == 1){
+        $idUser = mysqli_fetch_assoc($res)['usId'];
+    }
+    else {
+        $idUser ="";
+    }
+    mysqli_free_result($res);
+}
+else
+    $idUser = "";
+
+if (empty($idUser)){
+    $str = "Le profil est introuvable";
+    em_aff_debut($str, '../styles/cuiteur.css');
+    em_aff_entete($str);
+    em_aff_infos();
+    mysqli_close($bd);
+
+    em_aff_pied();
+    em_aff_fin();
+    ob_end_flush();
+    exit;
+}
 
 $sql = "SELECT 
                 usPseudo,
@@ -65,12 +90,13 @@ $sql = "SELECT
                 usBio,
                 usWeb,
                 (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$idUser}) AS nbBlabla,
-                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$idUser}) AS nbAbos,
-                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$idUser}) AS nbAbos2,
-                (SELECT COUNT(meIDUser) from mentions WHERE meIDBlabla = {$idUser}) AS nbMention,
-                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$idUser} AND eaIDAbonne = {$_SESSION["usID"]}) AS estAbonne
+                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$idUser}) AS nbAbos2,
+                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$idUser}) AS nbAbos,
+                (SELECT COUNT(*) from mentions WHERE meIDUser = {$idUser}) AS nbMention,
+                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$_SESSION["usID"]} AND eaIDAbonne = {$idUser}) AS estAbonne
             FROM users
-            WHERE usID = {$idUser}";
+            WHERE usID = {$idUser} OR usPseudo = {$idUser}";
+
 
 $res = em_bd_send_request($bd, $sql);
 $t = mysqli_fetch_assoc($res);
@@ -103,6 +129,10 @@ em_aff_infos();
         '</table></form>';
 // libération des ressources
 mysqli_free_result($res);
+
+
+
+
 mysqli_close($bd);
 
 em_aff_pied();

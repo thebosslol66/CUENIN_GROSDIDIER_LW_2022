@@ -1,4 +1,5 @@
 <?php
+
 //TODO: gerer si l'id entrée n'existre pas
 
 ob_start(); //démarre la bufferisation
@@ -14,10 +15,35 @@ if (! em_est_authentifie()){
 }
 $bd = em_bd_connect();
 
-if (empty($_GET["user"]))
-    $idUser = $_SESSION['usID'];
-else
+if (!empty($_GET["user"]))
     $idUser = $_GET["user"];
+elseif(!empty($_GET["pseudo"])){
+    $idUser = $_GET["pseudo"];
+    $sql = "SELECT usId FROM `users` WHERE `usPseudo` = '{$_GET["pseudo"]}'";
+    $res = em_bd_send_request($bd, $sql);
+    if (mysqli_num_rows($res) == 1){
+        $idUser = mysqli_fetch_assoc($res)['usId'];
+    }
+    else {
+        $idUser ="";
+    }
+    mysqli_free_result($res);
+}
+else
+    $idUser = "";
+
+if (empty($idUser)){
+    $str = "Le profil est introuvable";
+    em_aff_debut($str, '../styles/cuiteur.css');
+    em_aff_entete($str);
+    em_aff_infos();
+    mysqli_close($bd);
+
+    em_aff_pied();
+    em_aff_fin();
+    ob_end_flush();
+    exit;
+}
 
 $page_user_info = tcag_get_user_infos_send_req($bd, tcag_get_user_infos_prep_req([$idUser]))[0];
 
@@ -36,9 +62,10 @@ $sql = "
         users2.usNom AS oriNom, 
         users2.usAvecPhoto AS oriPhoto
 	FROM 
-        (blablas INNER JOIN users ON blIDAuteur = users.usID)
-            LEFT OUTER JOIN `users` AS users2 ON `blIDAutOrig` = users2.usID
-	WHERE users.usID = {$idUser})     
+        ((blablas INNER JOIN users ON blIDAuteur = users.usID)
+            LEFT OUTER JOIN `users` AS users2 ON `blIDAutOrig` = users2.usID)
+            LEFT OUTER JOIN `mentions` ON blId = meIDBlabla
+	WHERE meIDUser = {$idUser})     
 ORDER BY blDate DESC, blHeure DESC";
 
 $res = em_bd_send_request($bd, $sql);
@@ -53,7 +80,7 @@ echo '<div class="user-infos">';
 echo '</div>',
      '<ul>';
     if (mysqli_num_rows($res) == 0){
-        echo '<li>Le fil de blablas est vide</li>';
+        echo "<li>Vous n'avez été mentionné nulle part #sad</li>";
     }
     else{
         em_aff_blablas($res);

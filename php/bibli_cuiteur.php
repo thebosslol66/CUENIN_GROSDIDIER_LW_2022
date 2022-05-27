@@ -43,6 +43,11 @@ define('AGE_MAX', 120);
 
 define('CUIT_PER_REQUEST', 4);
 
+define('NB_SUGGESTIONS', 5);
+define('NB_MAX_ABO_REQUEST', 10);
+
+define('NB_AFFICHAGE_TENDANCES', 4);
+define('NB_AFFICHAGE_SUGGESTIONS', 2);
 
 //_______________________________________________________________
 /**
@@ -50,7 +55,7 @@ define('CUIT_PER_REQUEST', 4);
  *
  * @param ?string    $titre  Titre de l'entete (si null, affichage de l'entete de cuiteur.php avec le formulaire)
  */
-function em_aff_entete(?string $titre = null, bool $link=true):void{
+function em_aff_entete(?string $titre = null, bool $link=true, string $mention=""):void{
     echo '<div id="bcContenu">',
           $link ? '<header>' : '<header class="deconnecte">';
 	if ($link){
@@ -61,7 +66,7 @@ function em_aff_entete(?string $titre = null, bool $link=true):void{
     }
     if ($titre === null){
         echo    '<form action="" method="POST">',
-                    '<textarea name="txtMessage"></textarea>',
+                    '<textarea name="txtMessage">', $mention, '</textarea>',
                     '<input type="submit" name="btnPublier" value="" title="Publier mon message">',
                 '</form>';
     }
@@ -97,8 +102,8 @@ function em_aff_infos(bool $connecte = true):void{
     $t = mysqli_fetch_assoc($res);
 
     $blabla = $t['nbBlabla'] <= 1 ? "blabla": "blablas";
-    $abonnement = $t['nbAbos'] <= 1 ? "abonné": "abonnés";
-    $abonne = $t['nbAbos2'] <= 1 ? "abonement": "abonements";
+    $abonne = $t['nbAbos'] <= 1 ? "abonné": "abonnés";
+    $abonnement = $t['nbAbos2'] <= 1 ? "abonement": "abonements";
 
         echo
             '<h3>Utilisateur</h3>',
@@ -112,32 +117,45 @@ function em_aff_infos(bool $connecte = true):void{
         echo    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($t['usPseudo']).'</strong>','user', $t['usId'], 'Voir mes infos'),
                 ' ', '<strong>', em_html_proteger_sortie($t['usNom']), '</strong>',
                 '</li>',
-                '<li>', em_html_a('blablas.php', "{$t['nbBlabla']} ".$blabla, 'user', $t['usId'], "Afficher les blablas de {$t['usPseudo']}"), '</li>',
-                '<li>', em_html_a('abonnes.php', "{$t['nbAbos2']} ".$abonne, 'user', $t['usId'], "Afficher les abonés de {$t['usPseudo']}"),'</li>',
-                '<li>', em_html_a('abonnements.php', "{$t['nbAbos']} ".$abonnement, 'user', $t['usId'], "Afficher les abonements de {$t['usPseudo']}"),'</li>',    
-            '</ul>',
-            '<h3>Tendances</h3>',
-            '<ul>',
-                '<li>#<a href="../index.html" title="Voir les blablas contenant ce tag">info</a></li>',
-                '<li>#<a href="../index.html" title="Voir les blablas contenant ce tag">lol</a></li>',
-                '<li>#<a href="../index.html" title="Voir les blablas contenant ce tag">imbécile</a></li>',
-                '<li>#<a href="../index.html" title="Voir les blablas contenant ce tag">fairelafete</a></li>',
-                '<li><a href="../index.html">Toutes les tendances</a><li>',
-            '</ul>',
-            '<h3>Suggestions</h3>',             
-            '<ul>',
-                '<li>',
-                    '<img src="../images/yoda.jpg" alt="photo de l\'utilisateur">',
-                    '<a href="../index.html" title="Voir mes infos">yoda</a> Yoda',
-                '</li>',       
-                '<li>',
-                    '<img src="../images/paulo.jpg" alt="photo de l\'utilisateur">',
-                    '<a href="../index.html" title="Voir mes infos">paulo</a> Jean-Paul Sartre',
-                '</li>',
-                '<li><a href="../index.html">Plus de suggestions</a></li>',
+                '<li>', em_html_a('blablas.php', "{$t['nbBlabla']} ".$blabla, 'user', $t['usId'], "Afficher les {$blabla} de {$t['usPseudo']}"), '</li>',
+                '<li>', em_html_a('abonnements.php', "{$t['nbAbos']} ".$abonnement, 'user', $t['usId'], "Afficher les {$abonnement} de {$t['usPseudo']}"),'</li>',  
+                '<li>', em_html_a('abonnes.php', "{$t['nbAbos2']} ".$abonne, 'user', $t['usId'], "Afficher les {$abonne} de {$t['usPseudo']}"),'</li>',  
             '</ul>';
             // libération des ressources
             mysqli_free_result($res);
+            $sql = "SELECT taID, COUNT(*) AS NB
+            FROM tags JOIN blablas ON taIDBlabla = blID
+            GROUP BY taID
+            ORDER BY NB DESC
+            LIMIT 0,".NB_AFFICHAGE_TENDANCES;
+            $res = em_bd_send_request($bd, $sql);
+            echo '<h3>Tendances</h3>',
+            '<ul>';
+            while ($t = mysqli_fetch_assoc($res)) {
+                echo "<li>#<a href=\"../tendances.php?tag={$t['taID']}\" title=\"Voir les blablas contenant ce tag\">{$t['taID']}</a></li>";
+            }
+            echo    '<li><a href="./tendances.php">Toutes les tendances</a><li>',
+            '</ul>';
+            mysqli_free_result($res);
+            echo '<h3>Suggestions</h3>',             
+            '<ul>';
+            $final_sugestion = tcag_get_sugestions($bd, NB_AFFICHAGE_SUGGESTIONS, NB_MAX_ABO_REQUEST);
+            $res = tcag_get_user_infos_prep_req($final_sugestion);
+            if ($res){
+                $all_match = tcag_get_user_infos_send_req($bd, $res);
+                foreach($all_match as $suggestion){
+                    echo '<li>',
+                            '<img src="../', ($suggestion['usAvecPhoto'] == 1 ? "upload/{$suggestion['usId']}.jpg" : 'images/anonyme.jpg'), 
+                            '" alt="photo de l\'auteur">',
+                            em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($suggestion['usPseudo']).'</strong>','user', $suggestion['usId'], "Voir les infos de {$suggestion['usPseudo']}"), 
+                            ' ', '<strong>', em_html_proteger_sortie($suggestion['usNom']), '</strong>',
+                        '</li>';
+                }
+            } else {
+                echo '<li>Nous n\'avouns pas de suggestions pour le moment</li>';
+            }
+            echo    '<li><a href="./suggestions.php">Plus de suggestions</a></li>',
+                '</ul>';
             mysqli_close($bd);
         }
     echo '</aside>',
@@ -200,14 +218,14 @@ function em_aff_blablas(mysqli_result $r): void {
         echo    '<li>', 
                     '<img src="../', ($photo == 1 ? "upload/$id_orig.jpg" : 'images/anonyme.jpg'), 
                     '" class="imgAuteur" alt="photo de l\'auteur">',
-                    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($pseudo_orig).'</strong>','user', $id_orig, 'Voir mes infos'), 
+                    em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($pseudo_orig).'</strong>','user', $id_orig, 'Voir les infos de '.em_html_proteger_sortie($pseudo_orig)), 
                     ' ', em_html_proteger_sortie($nom_orig),
                     ($t['oriID'] !== null ? ', recuité par '
                                             .em_html_a( 'utilisateur.php','<strong>'.em_html_proteger_sortie($t['autPseudo']).'</strong>',
-                                                        'id', $t['autID'], 'Voir mes infos') : ''),
+                                                        'user', $t['autID'], 'Voir les infos de '.em_html_proteger_sortie($t['autPseudo'])) : ''),
                     '<br>';
 
-                    $output = em_html_proteger_sortie($t['blTexte']);
+                    $output = htmlspecialchars($t['blTexte'], ENT_NOQUOTES, "UTF-8");
                     $output = ag_active_mention_and_tags($output);
                     echo $output;
 
@@ -218,18 +236,19 @@ function em_aff_blablas(mysqli_result $r): void {
                     } else  {
                         echo 
                     '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'-rep\').submit();">Répondre</a>',
-                    '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'rec\').submit();">Recuiter</a>';
+                    '<a href="#" onclick="document.getElementById(\'cuit-'.$t['blID'].'-rec\').submit();">Recuiter</a>';
                     }
                     echo 
-                    '<form method="POST" id="cuit-',  $t['blID'], '-del">',
+                    '<form action="cuiteur.php" method="POST" id="cuit-',  $t['blID'], '-del">',
                         '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
                         '<input type="hidden" id="blaction" name="blaction" value="delete">',
                     '</form>',
-                    '<form method="POST" id="cuit-',  $t['blID'], '-rep">',
+                    '<form action="cuiteur.php" method="POST" id="cuit-',  $t['blID'], '-rep">',
                         '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
                         '<input type="hidden" id="blaction" name="blaction" value="response">',
+                        '<input type="hidden" id="authorName" name="authorName" value="', $pseudo_orig, '">',
                     '</form>',
-                    '<form method="POST" id="cuit-',  $t['blID'], '-rec">',
+                    '<form action="cuiteur.php" method="POST" id="cuit-',  $t['blID'], '-rec">',
                         '<input type="hidden" id="blablaId" name="blablaId" value="', $t['blID'], '">',
                         '<input type="hidden" id="blaction" name="blaction" value="recuit">',
                     '</form>',
@@ -238,7 +257,13 @@ function em_aff_blablas(mysqli_result $r): void {
     }
     if ($compteur < mysqli_num_rows($r)){
         echo    '<li class="plusBlablas">',
-                    '<a href="?page=', $_GET['page']+1, '"><strong>Plus de blablas</strong></a>',
+                    '<a href="?page=', $_GET['page']+1;
+        foreach ($_GET as $key => $value){
+            if ($key !== "page"){
+                echo "&$key=$value";
+            }
+        }
+        echo         '"><strong>Plus de blablas</strong></a>',
                     '<img src="../images/speaker.png" width="75" height="82" alt="Image du speaker \'Plus de blablas\'">',
                 '</li>';
     }
@@ -378,26 +403,201 @@ function get_tags_mentionned(string $text): array {
 }
 
 function ag_active_mention_and_tags(string $cuit): string {
-    $cuit = html_entity_decode($cuit, ENT_NOQUOTES, "UTF-8");
-    $t = preg_replace("/(?<=([^&]))#([a-zA-Z0-9éâîôùèçàïû]+)/m", "<a class=\"tag\" href=\"tendances.php?tag=$2\">#$2</a>", $cuit);
-    $t = preg_replace("/(?<=([^&]))@([a-zA-Z0-9]+)[$]?/", "<a class=\"peopleCite\" href=\"utilisateur.php?pseudo=$2\">@$2</a>", $t);
+    $t = preg_replace("/(?<=([^&])|^)#([a-zA-Z0-9éâîôùèçàïû]+)/m", "<a class=\"tag\" href=\"tendances.php?tag=$2\">#$2</a>", $cuit);
+    $t = preg_replace("/(?<=([^&])|^)@([a-zA-Z0-9]+)/", "<a class=\"peopleCite\" href=\"utilisateur.php?pseudo=$2\">@$2</a>", $t);
     return $t;
 }
 
+function tcag_get_user_infos_prep_req(array $usIdArray): string {
+    $sql = "";
+    $c = 0;
+    foreach ($usIdArray as $usId){
+        if ($c != 0){
+            $sql .= " UNION ";
+        }
+        $sql .= "(SELECT 
+            usId,
+            usPseudo,
+            usAvecPhoto,
+            usNom,
+            (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$usId}) AS nbBlabla,
+            (SELECT COUNT(*) from mentions WHERE meIDUser = {$usId}) AS nbMention,
+            (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$usId}) AS nbAbos,
+            (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$usId}) AS nbAbos2,
+            (SELECT COUNT(*) from estabonne WHERE eaIDUser = {$_SESSION['usID']} AND eaIDAbonne = {$usId}) AS isAbo
+        FROM users
+        WHERE usID = {$usId})";
+        $c = $c +1;
+    }
+    return $sql;
+}
 
-function tcag_aff_user_infos(array $infos){
+function tcag_get_user_infos_send_req(mysqli $bd, string $sql): false | array {
+    if (!empty($sql)){
+        $info_user_search = em_bd_send_request($bd, $sql);
+        if (mysqli_num_rows($info_user_search) > 0){
+            $res = [];
+            while (($t = mysqli_fetch_assoc($info_user_search))){
+                $res[] = $t;
+            }
+            mysqli_free_result($info_user_search);
+            return $res;
+        }
+    }
+    return false;
+}
+
+
+function tcag_aff_user_infos(array $infos): void {
     $blabla = $infos['nbBlabla'] <= 1 ? "blabla": "blablas";
     $mention = $infos['nbMention'] <= 1 ? "mention": "mentions";
-    $abonnement = $infos['nbAbos'] <= 1 ? "abonné": "abonnés";
-    $abonne = $infos['nbAbos2'] <= 1 ? "abonement": "abonements";
+    $abonne = $infos['nbAbos'] <= 1 ? "abonné": "abonnés";
+    $abonnement = $infos['nbAbos2'] <= 1 ? "abonement": "abonements";
     echo    '<img src="../', ($infos['usAvecPhoto'] == 1 ? "upload/{$infos['usId']}.jpg" : 'images/anonyme.jpg'), 
             '" class="imgAuteur" alt="photo de l\'auteur">',
-            em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($infos['usPseudo']).'</strong>','user', $infos['usId'], 'Voir mes infos'), 
+            em_html_a('utilisateur.php', '<strong>'.em_html_proteger_sortie($infos['usPseudo']).'</strong>','user', $infos['usId'], "Voir les infos de {$infos['usPseudo']}"), 
             ' ', '<strong>', em_html_proteger_sortie($infos['usNom']), '</strong>',
             '<br>',
             em_html_a('blablas.php', "{$infos['nbBlabla']} ".$blabla, 'user', $infos['usId'], "Afficher les blablas de {$infos['usPseudo']}"), ' - ',
             em_html_a('mentions.php', "{$infos['nbMention']} ".$mention, 'user', $infos['usId'], "Afficher les mentions de {$infos['usPseudo']}"), ' - ',
-            em_html_a('abonnes.php', "{$infos['nbAbos2']} ".$abonne, 'user', $infos['usId'], "Afficher les abonés de {$infos['usPseudo']}"), ' - ',
-            em_html_a('abonnements.php', "{$infos['nbAbos']} ".$abonnement, 'user', $infos['usId'], "Afficher les abonements de {$infos['usPseudo']}");
+            em_html_a('abonnes.php', "{$infos['nbAbos']} ".$abonne, 'user', $infos['usId'], "Afficher les abonnes de {$infos['usPseudo']}"), ' - ',
+            em_html_a('abonnements.php', "{$infos['nbAbos2']} ".$abonnement, 'user', $infos['usId'], "Afficher les abonnements de {$infos['usPseudo']}");
+}
+
+function tcag_aff_user_infos_with_abo_button(array $us_infos): void {
+    if ($_SESSION['usID'] != $us_infos['usId']){
+        echo '<p class="abonement-checkbox">';
+        if ($us_infos['isAbo'] == 0){
+            echo    '<input type="checkbox" title="S\'abonner a '.$us_infos['usPseudo'].'" value="" id="abonner-'.$us_infos['usId'].'" name="abonner-'.$us_infos['usId'].'">',
+                    '<label for="abonner-'.$us_infos['usId'].'">S\'abonner</label>';
+        } else {
+            echo    '<input type="checkbox" title="Se désabonner de '.$us_infos['usPseudo'].'" value="Se désabonner" id="desabonner-'.$us_infos['usId'].'" name="desabonner-'.$us_infos['usId'].'">',
+                    '<label for="desabonner-'.$us_infos['usId'].'">Se désabonner</label>';
+        }
+        echo '</p>';
+    }
+}
+
+
+function tcag_aff_result_list_users(array $all_match, int $userId): void {
+    $number_result = count($all_match);
+    echo '<ul>';
+    for ($i = 0; $i < $number_result; $i++){
+        echo '<li>';
+        if ($all_match[$i]['usId'] == $_SESSION['usID']){
+            echo '<div class="user-infos">';
+                    tcag_aff_user_infos($all_match[$i]);
+            echo '</div>';
+        }
+        else {
+            tcag_aff_user_infos($all_match[$i]);
+            tcag_aff_user_infos_with_abo_button($all_match[$i]);
+        }
+        
+        echo '</li>';
+    }
+    echo '</ul>';
+    if ($number_result > 0 || $_SESSION['usID'] != $userId){
+        echo '<table>',
+                '<tr>',
+                    '<td>',
+                    '<input type="submit" name="btnAbonner" id="btnAbonner" value="Valider" title="S\'abonner ou se désabonner des personnes sélectionnées">',
+                    '</td>',
+                '</tr>',
+            '</table>';
+    }
+    echo    '</form>';
+}
+
+function tcag_catch_result_list_users_responce(mysqli $bd): void {
+    if (isset($_POST['btnAbonner'])){
+        $array_to_abonner = NULL;
+        $array_to_abonner_counter = 0;
+    
+        $array_to_desabonner = NULL;
+        $array_to_desabonner_counter = 0;
+    
+        foreach($_POST as $key=>$value){
+            if (preg_match("/^abonner-([0-9]+)$/", $key, $id_abonner)){
+                $array_to_abonner[$array_to_abonner_counter] = $id_abonner[1];
+                $array_to_abonner_counter++;
+            }
+            elseif (preg_match("/^desabonner-([0-9]+)$/", $key, $id_desabonner)){
+                $array_to_desabonner[$array_to_desabonner_counter] = $id_desabonner[1];
+                $array_to_desabonner_counter++;
+            }
+        }
+        $sql = "";
+        for ($i = 0; $i < $array_to_desabonner_counter; $i++){
+            if ($i == 0){
+                $sql = "DELETE FROM `estabonne` WHERE (eaIDAbonne = {$array_to_desabonner[$i]} AND eaIDUser = {$_SESSION['usID']})";
+            } else {
+                $sql .= " OR ( eaIDAbonne = {$array_to_desabonner[$i]} AND eaIDUser = {$_SESSION['usID']})";
+            }
+        }
+        if ($sql){
+            em_bd_send_request($bd, $sql);
+        }
+        $sql = "";
+        $date_abonnement = date('Ymd');
+        for ($i = 0; $i < $array_to_abonner_counter; $i++){
+            if ($i == 0){
+                $sql = "INSERT INTO `estabonne`(`eaIDUser`, `eaIDAbonne`, `eaDate`) VALUES ('{$_SESSION['usID']}', '{$array_to_abonner[$i]}', '$date_abonnement')";
+            } else {
+                $sql .= ", ('{$_SESSION['usID']}', '{$array_to_abonner[$i]}', '$date_abonnement')";
+            }
+        }
+        if ($sql){
+            em_bd_send_request($bd, $sql);
+        }
+        header('Location: ./cuiteur.php');
+    }
+}
+
+function tcag_get_sugestions(mysqli $bd, int $nb_max_suggestions, int $nb_max_max_abos): false | array {
+    $sql = "SELECT DISTINCT usID, usPseudo
+            FROM users INNER JOIN estabonne ON usID=eaIDAbonne
+            WHERE eaIDUser IN (SELECT eaIDAbonne FROM estabonne WHERE eaIDuser={$_SESSION['usID']})
+            AND usID!={$_SESSION['usID']}
+            AND usID NOT IN (SELECT eaIDAbonne FROM estabonne WHERE eaIDuser={$_SESSION['usID']})
+            LIMIT {$nb_max_suggestions}";
+
+
+    $result = em_bd_send_request($bd, $sql);
+
+    $suggested_result = [];
+    $final_sugestion = [];
+
+    while (($t = mysqli_fetch_assoc($result))){
+        $suggested_result[] = $t['usID'];
+    }
+    mysqli_free_result($result);
+
+    if (count($suggested_result) < $nb_max_suggestions){
+        $final_sugestion = $suggested_result;
+        $probable_sugested = [];
+
+        $sql = "SELECT usID, COUNT(usID), dejaAbonne.eaIDUser 
+                FROM (users INNER JOIN estabonne ON usID=eaIDUser) 
+                    LEFT OUTER JOIN estabonne AS dejaAbonne ON usID=dejaAbonne.eaIDAbonne AND dejaAbonne.eaIDUser={$_SESSION['usID']}
+                GROUP BY usID ORDER BY COUNT(usID) DESC LIMIT {$nb_max_max_abos}";
+
+        $result = em_bd_send_request($bd, $sql);
+
+        while (($t = mysqli_fetch_assoc($result))){
+            if ($t['eaIDUser'] == false && !in_array($t['usID'], $final_sugestion )){
+                $probable_sugested[] = $t['usID'];
+            }
+        }
+
+        mysqli_free_result($result);
+
+        while (count($final_sugestion) < $nb_max_suggestions && count($probable_sugested) > 0){
+            $t = rand(0, count($probable_sugested)-1);
+            $final_sugestion[] = $probable_sugested[$t];
+            array_splice($probable_sugested, $t, 1); 
+        }
+    }
+    return $final_sugestion;
 }
 ?>

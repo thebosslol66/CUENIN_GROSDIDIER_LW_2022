@@ -72,6 +72,10 @@ function tcag_gere_form_1 (mysqli $bd):array {
             if (mb_strlen($_POST['bio'], 'UTF-8') > $maxlenbio){
                 $erreurs[] = 'La bio ne peut pas dépasser ' . $maxlenbio . ' caractères.';
             }
+            $noTags = strip_tags($_POST['bio']);
+            if ($noTags != $_POST['bio']){
+                $erreurs[] = 'La bio ne peut pas contenir de code HTML.';
+            }
         }
 
         // s'il y a des erreurs ==> on retourne le tableau d'erreurs    
@@ -158,30 +162,71 @@ function tcag_gere_form_3 (mysqli $bd):array {
         foreach($_POST as &$val){
             $val = trim($val);
         }
-        
-        // vérification des mots de passe
-        if ($_POST['passe1'] !== $_POST['passe2']) {
-            $erreurs[] = 'Les mots de passe doivent être identiques.';
+        if (!empty($_POST['passe1']) || !empty($_POST['passe2'])) {
+            // vérification des mots de passe
+            if ($_POST['passe1'] !== $_POST['passe2']) {
+                $erreurs[] = 'Les mots de passe doivent être identiques.';
+            }
+            $nb = mb_strlen($_POST['passe1'], 'UTF-8');
+            if ($nb < LMIN_PASSWORD || $nb > LMAX_PASSWORD){
+                $erreurs[] = 'Le mot de passe doit être constitué de '. LMIN_PASSWORD . ' à ' . LMAX_PASSWORD . ' caractères.';
+            }
+            // s'il y a des erreurs ==> on retourne le tableau d'erreurs    
+            if (! count($erreurs) > 0) {
+                $passe1 = password_hash($_POST['passe1'], PASSWORD_DEFAULT);
+                $passe1 = em_bd_proteger_entree($bd, $passe1);
+
+
+
+                $sql = "UPDATE users
+                        SET usPasse = '{$_POST['passe1']}'
+                        WHERE usID = {$_SESSION['usID']}";
+                        
+                em_bd_send_request($bd, $sql);
+
+            }
+            
         }
-        $nb = mb_strlen($_POST['passe1'], 'UTF-8');
-        if ($nb < LMIN_PASSWORD || $nb > LMAX_PASSWORD){
-            $erreurs[] = 'Le mot de passe doit être constitué de '. LMIN_PASSWORD . ' à ' . LMAX_PASSWORD . ' caractères.';
+        if (!empty($_FILES['photo']['name'])) {
+            $nom = $_FILES['photo']['name'];
+            $ext = strtolower(substr($nom, strrpos($nom, '.')));
+            if ($ext != ".jpg") {
+                $erreurs[] = 'Extension du fichier non autorisée';
+            }
+
+            $type = mime_content_type($_FILES['photo']['tmp_name']);
+            if ($type != 'image/jpeg') {
+                $erreurs[] = 'Le contenu du fichier n\'est pas valide';
+            }
+
+            $Dest = "../upload/{$_SESSION['usID']}.jpg";
+            
+            if (! count($erreurs) > 0) {
+                if ($_FILES['photo']['error'] === 0
+                && @is_uploaded_file($_FILES['photo']['tmp_name'])
+                && @move_uploaded_file($_FILES['photo']['tmp_name'], $Dest)) {
+                    
+                } else {
+                    $erreurs[] = "Le fichier n'a pas pu être uploadé";
+                }
+            }
         }
-        
+
         if ($_POST['usePhoto'] != 0 && $_POST['usePhoto'] != 1) {
             $erreurs[] = 'Il y a eu un problème avec la selection de "Utiliser votre photo"';
         }
+        if (($_POST['usePhoto'] == 1)&&(! file_exists("../upload/{$_SESSION['usID']}.jpg")))
+            $erreurs[] = "Impossible d'utiliser la photo actuelle, il n'y en a pas.";
+        
+
 
         // s'il y a des erreurs ==> on retourne le tableau d'erreurs    
         if (! count($erreurs) > 0) {
-            $passe1 = password_hash($_POST['passe1'], PASSWORD_DEFAULT);
-            $passe1 = em_bd_proteger_entree($bd, $passe1);
 
 
 
             $sql = "UPDATE users
-                    SET usPasse = '{$_POST['passe1']}'
-                    ,usAvecPhoto = '{$_POST['usePhoto']}'
+                    SET usAvecPhoto = '{$_POST['usePhoto']}'
                     WHERE usID = {$_SESSION['usID']}";
                     
             em_bd_send_request($bd, $sql);
@@ -295,7 +340,7 @@ if (count($err2) > 0) {
     '</tr>',
     '</table></form>';
 
-echo '<form method="post" action="#">',
+echo '<form enctype="multipart/form-data" method="post" action="#">',
     '<h2 class=titreCompte>Paramètres de votre compte Cuiteur</h2><table class=tabCentre>';
     if (count($err3) > 0) {
         echo '<p class="error">Les erreurs suivantes ont été détectées :';
@@ -306,15 +351,11 @@ echo '<form method="post" action="#">',
     } else if (! empty($_POST['part3'])) {
         echo '<p class="noterror">La mise à jour des informations sur votre compte a bien été effectuée</p>';
     }
-    em_aff_ligne_input('Changer le mot de passe :', array('type' => 'password', 'name' => 'passe1', 'value' => '', 'required' => null));
-    em_aff_ligne_input('Répétez le mot de passe :', array('type' => 'password', 'name' => 'passe2', 'value' => '', 'required' => null));
+    em_aff_ligne_input('Changer le mot de passe :', array('type' => 'password', 'name' => 'passe1', 'value' => ''));
+    em_aff_ligne_input('Répétez le mot de passe :', array('type' => 'password', 'name' => 'passe2', 'value' => ''));
     $srcPhoto = '<img src="../';
-    if ($t['usAvecPhoto'] == 1) {
-        $srcPhoto .= "upload/{$t['usID']}.jpg";
-    } else {
-        $srcPhoto .= 'images/anonyme.jpg';
-    }
-    $srcPhoto .= '" class="imgAuteur" alt="Votre photo">';
+    $srcPhoto .= "upload/{$t['usID']}.jpg\" alt=\"Image non trouvée\"";
+    $srcPhoto .= ' class="imgAuteur" alt="Votre photo">';
     if (empty($_POST['usePhoto'])) {
         if ($t['usAvecPhoto'] == 1) {
             $inlast = '<input type="radio" name="usePhoto" value="0">non
@@ -331,8 +372,9 @@ echo '<form method="post" action="#">',
         <input type="radio" name="usePhoto" value="1" >oui';
     }
     
-    em_genere_ligne_tab ('Votre photo actuelle', $srcPhoto.'<br>Taille 20ko maximum<br>Image JPG carrée (mini 50x50px)<input type="file">');
+    em_genere_ligne_tab ('Votre photo actuelle', $srcPhoto.'<br>Taille 20ko maximum<br>Image JPG carrée (mini 50x50px)<input type="file" name="photo">');
     em_genere_ligne_tab ('Utiliser votre photo', $inlast);
+    echo '<input type="hidden" name="MAX_FILE_SIZE" value="0.05">';
     echo 
     '<tr>',
         '<td colspan="2">',
