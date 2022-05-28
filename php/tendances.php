@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * Récupère les tags les plus utilisées depuis $date dans la base de données et les affiches
+ * 
+ * @param $bd Object de connexion à la base de données
+ * @param int $date date depuis laquelle on veux récupere les tags les plus utilisées
+ * @param string $titre Titre de la sections de tags
+ */
 function tcag_aff_ligne_tendance (mysqli $bd, int $date, String $titre):void {
     $sql = "SELECT taID, COUNT(*) AS NB
     FROM tags JOIN blablas ON taIDBlabla = blID

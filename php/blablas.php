@@ -33,7 +33,7 @@ $sql = "
 	FROM 
         (blablas INNER JOIN users ON blIDAuteur = users.usID)
             LEFT OUTER JOIN `users` AS users2 ON `blIDAutOrig` = users2.usID
-	WHERE users.usID = {$idUser})     
+	WHERE users.usID = {$idUser})
 ORDER BY blDate DESC, blHeure DESC";
 
 $res = em_bd_send_request($bd, $sql);

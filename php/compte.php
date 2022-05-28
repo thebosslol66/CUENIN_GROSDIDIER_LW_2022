@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Gère le premier formulaire dans le cas où on l'a rempli et validé
+ * 
+ * @param mysqli $bd Connexion à la base de données
+ * @return array
+ */
 function tcag_gere_form_1 (mysqli $bd):array {
     $erreurs = array();
     
@@ -100,6 +106,12 @@ function tcag_gere_form_1 (mysqli $bd):array {
     
 }
 
+/**
+ * Gère le second formulaire dans le cas où on l'a rempli et validé
+ * 
+ * @param mysqli $bd Connexion à la base de données
+ * @return array
+ */
 function tcag_gere_form_2 (mysqli $bd):array {
     $erreurs = array();
     
@@ -155,6 +167,12 @@ function tcag_gere_form_2 (mysqli $bd):array {
     
 }
 
+/**
+ * Gère le troisième formulaire dans le cas où on l'a rempli et validé
+ * 
+ * @param mysqli $bd Connexion à la base de données
+ * @return array
+ */
 function tcag_gere_form_3 (mysqli $bd):array {
     $erreurs = array();
     
@@ -188,20 +206,31 @@ function tcag_gere_form_3 (mysqli $bd):array {
             
         }
         if (!empty($_FILES['photo']['name'])) {
+            if ($_FILES['photo']['size'] > 20480) {
+                $erreurs[] = "Le fichier est trop volumineux";
+            }
+            
             $nom = $_FILES['photo']['name'];
             $ext = strtolower(substr($nom, strrpos($nom, '.')));
             if ($ext != ".jpg") {
                 $erreurs[] = 'Extension du fichier non autorisée';
             }
-
             $type = mime_content_type($_FILES['photo']['tmp_name']);
             if ($type != 'image/jpeg') {
                 $erreurs[] = 'Le contenu du fichier n\'est pas valide';
             }
-
-            $Dest = "../upload/{$_SESSION['usID']}.jpg";
+            $taille = getimagesize($_FILES['photo']['tmp_name']);
+            if (($taille[0] < 50) || ($taille[1] < 50)) {
+                $erreurs[] = "L'image est trop petite";
+            }
             
+            $Dest = "../upload/{$_SESSION['usID']}.jpg";
+
             if (! count($erreurs) > 0) {
+                $tn = imagecreatetruecolor(50, 50);
+                $image = imagecreatefromjpeg($_FILES['photo']['tmp_name']);
+                imagecopyresampled($tn, $image, 0, 0, 0, 0, 50, 50, $taille[0], $taille[1]) ;
+                imagejpeg ($tn, $_FILES['photo']['tmp_name']);
                 if ($_FILES['photo']['error'] === 0
                 && @is_uploaded_file($_FILES['photo']['tmp_name'])
                 && @move_uploaded_file($_FILES['photo']['tmp_name'], $Dest)) {
@@ -237,6 +266,12 @@ function tcag_gere_form_3 (mysqli $bd):array {
     
 }
 
+/**
+ * Génère une ligne de tableau, en préremplissant les balises de tableau
+ * 
+ * @param string $titre Partie gauche du tableau, présumément le titre lors de son utilisation
+ * @param string $donnee Donnée à mettre dans la partie droite du tableau
+ */
 function em_genere_ligne_tab (string $titre, string $donnee):void {
     echo "<tr><td>{$titre}</td><td>{$donnee}</td></tr>";
 }
@@ -308,8 +343,7 @@ if (count($err1) > 0) {
         em_aff_ligne_input('Date de naissance', array('type' => 'date', 'name' => 'naissance', 'value' => (empty($_POST['naissance']) ? $strdate : $_POST['naissance']), 'required' => null));
         em_aff_ligne_input( 'Ville', array('type' => 'text', 'name' => 'ville', 'value' => (empty($_POST['ville']) ? em_html_proteger_sortie($t['usVille']) : $_POST['ville']), 
         ''));
-        em_aff_ligne_input( 'Mini-bio', array('type' => 'text', 'name' => 'bio', 'value' => (empty($_POST['bio']) ? em_html_proteger_sortie($t['usBio']) : $_POST['bio']), 
-        ''));
+        em_genere_ligne_tab('Mini-bio', '<textarea name="bio" style="width:250px;height:150px;vertical-align:middle;">'.(empty($_POST['bio']) ? em_html_proteger_sortie($t['usBio']) : $_POST['bio']).'</textarea>');
 echo 
     '<tr>',
         '<td colspan="2">',
@@ -330,9 +364,9 @@ if (count($err2) > 0) {
     echo '<p class="noterror">La mise à jour des informations sur votre compte a bien été effectuée</p>';
 }
         em_aff_ligne_input( 'Adresse mail', array('type' => 'email', 'name' => 'email', 'value' =>  (empty($_POST['email']) ? em_html_proteger_sortie($t['usMail']) : $_POST['email']), 
-        'placeholder' => '', 'required' => null));
+        'placeholder' => '', 'required' => null, 'style' => 'width:275px'));
         em_aff_ligne_input( 'Site web', array('type' => 'text', 'name' => 'web', 'value' =>  (empty($_POST['web']) ? em_html_proteger_sortie($t['usWeb']) : $_POST['web']), 
-        'placeholder' => ''));
+        'placeholder' => '', 'style' => 'width:275px'));
         echo '<tr>',
         '<td colspan="2">',
             '<input type="submit" name="part2" value="Valider">',
@@ -372,9 +406,9 @@ echo '<form enctype="multipart/form-data" method="post" action="#">',
         <input type="radio" name="usePhoto" value="1" >oui';
     }
     
-    em_genere_ligne_tab ('Votre photo actuelle', $srcPhoto.'<br>Taille 20ko maximum<br>Image JPG carrée (mini 50x50px)<input type="file" name="photo">');
+    em_genere_ligne_tab ('Votre photo actuelle', $srcPhoto.'<p id="small"><br>Taille 20ko maximum<br>Image JPG carrée (mini 50x50px)<p><input type="file" name="photo">');
     em_genere_ligne_tab ('Utiliser votre photo', $inlast);
-    echo '<input type="hidden" name="MAX_FILE_SIZE" value="0.05">';
+    echo '<input type="hidden" name="MAX_FILE_SIZE" value="20480">';
     echo 
     '<tr>',
         '<td colspan="2">',

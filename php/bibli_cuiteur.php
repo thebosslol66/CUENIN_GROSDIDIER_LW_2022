@@ -19,10 +19,15 @@ mb_regex_encoding ('UTF-8');
 define('IS_DEV', true);//true en phase de développement, false en phase de production
 
  // Paramètres pour accéder à la base de données
-define('BD_SERVER', 'localhost');
+/*define('BD_SERVER', 'localhost');
 define('BD_NAME', 'cuiteur_bd');
 define('BD_USER', 'cuiteur_userl');
-define('BD_PASS', 'cuiteur_passl'); 
+define('BD_PASS', 'cuiteur_passl');
+*/
+define('BD_SERVER', 'localhost');
+define('BD_NAME', 'cuenin_cuiteur');
+define('BD_USER', 'cuenin_u');
+define('BD_PASS', 'cuenin_p');
 /*define('BD_NAME', 'merlet_cuiteur');
 define('BD_USER', 'merlet_u');
 define('BD_PASS', 'merlet_p');*/
