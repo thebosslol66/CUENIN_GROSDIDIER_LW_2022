@@ -41,6 +41,8 @@ define('LMAX_PASSWORD', 20);
 define('AGE_MIN', 18);
 define('AGE_MAX', 120);
 
+define('LMAX_MESSAGE', 255);
+
 define('CUIT_PER_REQUEST', 4);
 
 define('NB_SUGGESTIONS', 5);
@@ -132,7 +134,7 @@ function em_aff_infos(bool $connecte = true):void{
             echo '<h3>Tendances</h3>',
             '<ul>';
             while ($t = mysqli_fetch_assoc($res)) {
-                echo "<li>#<a href=\"../tendances.php?tag={$t['taID']}\" title=\"Voir les blablas contenant ce tag\">{$t['taID']}</a></li>";
+                echo '<li>#<a href="./tendances.php?tag=', urlencode($t['taID']), '" title="Voir les blablas contenant ce tag">', $t['taID'], '</a></li>';
             }
             echo    '<li><a href="./tendances.php">Toutes les tendances</a><li>',
             '</ul>';
@@ -152,7 +154,7 @@ function em_aff_infos(bool $connecte = true):void{
                         '</li>';
                 }
             } else {
-                echo '<li>Nous n\'avouns pas de suggestions pour le moment</li>';
+                echo '<li>Nous n\'avons pas de suggestions pour le moment</li>';
             }
             echo    '<li><a href="./suggestions.php">Plus de suggestions</a></li>',
                 '</ul>';
@@ -226,7 +228,7 @@ function em_aff_blablas(mysqli_result $r): void {
                     '<br>';
 
                     $output = htmlspecialchars($t['blTexte'], ENT_NOQUOTES, "UTF-8");
-                    $output = ag_active_mention_and_tags($output);
+                    $output = tcag_active_mention_and_tags($output);
                     echo $output;
 
                     echo '<p class="finMessage">',
@@ -256,8 +258,14 @@ function em_aff_blablas(mysqli_result $r): void {
         $compteur++;
     }
     if ($compteur < mysqli_num_rows($r)){
+        if (is_numeric($_GET['page'])){
         echo    '<li class="plusBlablas">',
                     '<a href="?page=', $_GET['page']+1;
+        }
+        else {
+            echo    '<li class="plusBlablas">',
+                    '<a href="?page=', 1;
+        }
         foreach ($_GET as $key => $value){
             if ($key !== "page"){
                 echo "&$key=$value";
@@ -392,22 +400,55 @@ function em_verification_connection(string $pseudo, string $password, string $ta
 }
 
 
+//_______________________________________________________________
+/**
+ * Récupère toutes les mentions d'utilisateus d'un blaba
+ * 
+ * @param string $text texte du blaba
+ * @return array Tableau contenant les mentions d'utilisateurs
+ */
 function get_users_mentionned(string $text): array {
     preg_match_all('/@([a-zA-Z0-9]+)/',$text,$matches, PREG_SET_ORDER, 0);
     return array_column($matches, 1);
 }
 
+/**
+ * Récupère toutes les tags d'un blaba
+ * 
+ * @param string $text texte du blaba
+ * @return array Tableau contenant les tags
+ */
 function get_tags_mentionned(string $text): array {
     preg_match_all('/#([a-zA-Z0-9éâîôùèçàïû]+)/',$text,$matches, PREG_SET_ORDER, 0);
     return array_column($matches, 1);
 }
 
-function ag_active_mention_and_tags(string $cuit): string {
-    $t = preg_replace("/(?<=([^&])|^)#([a-zA-Z0-9éâîôùèçàïû]+)/m", "<a class=\"tag\" href=\"tendances.php?tag=$2\">#$2</a>", $cuit);
-    $t = preg_replace("/(?<=([^&])|^)@([a-zA-Z0-9]+)/", "<a class=\"peopleCite\" href=\"utilisateur.php?pseudo=$2\">@$2</a>", $t);
+
+/**
+ * Ajoute les liens vers les mentions d'utilisateurs et les tags dans le texte
+ * 
+ * @param string $cuit texte du blaba
+ * @return string Texte du blaba avec les liens
+ */
+function tcag_active_mention_and_tags(string $cuit): string {
+    $t = preg_replace_callback('/(?<=([^&])|^)#([a-zA-Z0-9éâîôùèçàïû]+)/m', 
+        function ($matches){
+            return '<a class=\"tag\" href="tendances.php?tag='.urlencode($matches[2]).'">#'.$matches[2].'</a>';},
+        $cuit);
+    $t = preg_replace_callback('/(?<=([^&])|^)@([a-zA-Z0-9]+)/', 
+        function ($matches){
+            return '<a class="peopleCite" href="utilisateur.php?pseudo='.urlencode($matches[2]).'">@'.$matches[2].'</a>';},
+        $t);
     return $t;
 }
 
+//_______________________________________________________________
+/**
+ * Prépare une requetes SQL pour récuperer les informations de tous les utilisateurs listées dans $usIdArray
+ * Elle permet de récuperer d'uncoup les informations d'un tableau d'id d'utilisateurs
+ * 
+ * @param array $usIdArray tableau contenant les indentifiants des utilisateurs dont on veux recuperer les informations
+ */
 function tcag_get_user_infos_prep_req(array $usIdArray): string {
     $sql = "";
     $c = 0;
@@ -432,6 +473,14 @@ function tcag_get_user_infos_prep_req(array $usIdArray): string {
     return $sql;
 }
 
+//_______________________________________________________________
+/**
+ * Envoye une requete pour récupérer les infos d'une liste d'utilisateur précédament créé par la fonction tcag_get_user_infos_prep_req
+ * 
+ * @param mysqli $bd Objet de connexion à la base de données
+ * @param string $sql Requete SQL
+ * @return array Tableau associatif contenant les infos des utilisateurs ou false si une érreur est survenues
+ */
 function tcag_get_user_infos_send_req(mysqli $bd, string $sql): false | array {
     if (!empty($sql)){
         $info_user_search = em_bd_send_request($bd, $sql);
@@ -447,7 +496,13 @@ function tcag_get_user_infos_send_req(mysqli $bd, string $sql): false | array {
     return false;
 }
 
-
+//_______________________________________________________________
+/**
+ * Affiche toutes les informations d'un utilisateur
+ * Le nombre de blablas, de mentions, d'abonnés, d'abonnements, pseudo et nom
+ * 
+ * @param array $infos Les informations de l'utilisateur a afficher
+ */
 function tcag_aff_user_infos(array $infos): void {
     $blabla = $infos['nbBlabla'] <= 1 ? "blabla": "blablas";
     $mention = $infos['nbMention'] <= 1 ? "mention": "mentions";
@@ -464,6 +519,11 @@ function tcag_aff_user_infos(array $infos): void {
             em_html_a('abonnements.php', "{$infos['nbAbos2']} ".$abonnement, 'user', $infos['usId'], "Afficher les abonnements de {$infos['usPseudo']}");
 }
 
+//_______________________________________________________________
+/**
+ * Affiche la checkbox pour s'abonner à un utilisateur
+ * @param array $us_infos les information de l'utilisateur a afficher
+ */
 function tcag_aff_user_infos_with_abo_button(array $us_infos): void {
     if ($_SESSION['usID'] != $us_infos['usId']){
         echo '<p class="abonement-checkbox">';
@@ -478,7 +538,15 @@ function tcag_aff_user_infos_with_abo_button(array $us_infos): void {
     }
 }
 
-
+//_______________________________________________________________
+/**
+ * Gère l'affichage de la liste des utilisateurs avec leur infos
+ * Ajoute le bouton s'abonner ou se desabonner sur les utilisateurs différents de l'utilisateur courrant
+ * Ajoute le formulaire permettant l'abonnement ou le désabonnement des utilisateurs sélectionnées
+ * 
+ * @param array $all_match Tableau contenant les informations des utilisateurs à afficher
+ * @param int $userId ID de l'utilisateur afficher par la page (pour ne pas afficher le formulaire si on se trouve sur la page abonnement de l'utilisateur et qu'il n'en as aucun)
+ */
 function tcag_aff_result_list_users(array $all_match, int $userId): void {
     $number_result = count($all_match);
     echo '<ul>';
@@ -509,6 +577,15 @@ function tcag_aff_result_list_users(array $all_match, int $userId): void {
     echo    '</form>';
 }
 
+//_______________________________________________________________
+/**
+ * Gére les abonement et les désabonements sur les affichages des listes d'utilisateurs
+ * 
+ * Ajoute ou supprime des abonnements lorsqu'on clique sur les checkbox des utilisateurs
+ * Utilisées sur les pages Recherche d'utilisateurs, abonnements, abonnés et sugestions
+ * 
+ * @param mysqli $bd Objet de connexion à la base de données
+ */
 function tcag_catch_result_list_users_responce(mysqli $bd): void {
     if (isset($_POST['btnAbonner'])){
         $array_to_abonner = NULL;
@@ -554,6 +631,25 @@ function tcag_catch_result_list_users_responce(mysqli $bd): void {
     }
 }
 
+//_______________________________________________________________
+/** 
+ * Retourne les id des utilisateurs suggeré a l'utilisateur courrant
+ * 
+ * 1 étape:
+ *  - Récupérer les id des utilisateurs suivies par les personnes suivies par l'utilisateur courrant et dont il ne suit pas
+ *  - Si il y a plus de suggestions que $nb_max_suggestions alors on retourne 5 utilisateurs au hazard
+ * 2 étape:
+ *  - Si il y a moins de suggestions que $nb_max_suggestions alors on prend les $nb_max_max_abos utilisateurs qui possèdent le plus d'abonnées
+ * 3 étape:
+ *  - On ajoute au hazard les utilisarteur auquel il n'est pas abonnée
+ * 
+ * On retourne ensuite la liste des utilisateurs suggérés.
+ * 
+ * @param mysqli $bd Object de connexion à la base de données
+ * @param int $nb_max_suggestions Nombre maximum de suggestions
+ * @param int $nb_max_max_abos Nombre maximum d'utilisateurs à prendre avec le maximum d'abonnées pour ajouter au suggestions
+ * @return array Liste des id des utilisateurs suggérés
+ */
 function tcag_get_sugestions(mysqli $bd, int $nb_max_suggestions, int $nb_max_max_abos): false | array {
     $sql = "SELECT DISTINCT usID, usPseudo
             FROM users INNER JOIN estabonne ON usID=eaIDAbonne
@@ -598,6 +694,83 @@ function tcag_get_sugestions(mysqli $bd, int $nb_max_suggestions, int $nb_max_ma
             array_splice($probable_sugested, $t, 1); 
         }
     }
+    else{
+        while (count($final_sugestion) < $nb_max_suggestions && count($suggested_result) > 0){
+            $t = rand(0, count($suggested_result)-1);
+            $final_sugestion[] = $suggested_result[$t];
+            array_splice($suggested_result, $t, 1); 
+        }
+    }
     return $final_sugestion;
+}
+
+//_______________________________________________________________
+/**
+ * Retourne l'id de l'utilisateur saisie dans l'url sous forme de pseudo ou d'id
+ * 
+ * @param mysqli $bd Object de connexion à la base de données
+ * @return int|false Id de l'utilisateur ou false si l'utilisateur n'existe pas
+ */
+function tcag_get_user_id_from_url(mysqli $bd): false | int {
+    if (!empty($_GET["user"]) && is_numeric($_GET["user"]))
+        $idUser = $_GET["user"];
+    elseif(!empty($_GET["pseudo"])){
+        $idUser = $_GET["pseudo"];
+        $sql = 'SELECT usId FROM `users` WHERE `usPseudo` = "'. em_bd_proteger_entree($bd, $_GET["pseudo"]) .'"';
+        $res = em_bd_send_request($bd, $sql);
+        if (mysqli_num_rows($res) == 1){
+            $idUser = mysqli_fetch_assoc($res)['usId'];
+        }
+        else {
+            $idUser = false;
+        }
+        mysqli_free_result($res);
+    }
+    else
+        $idUser = false;
+    return $idUser;
+}
+
+//_______________________________________________________________
+/**
+ * Affiche unez page d'érreur disant que l'utilisateur n'a pas été trouvé
+ * 
+ * @param mysqli $bd Object de connexion à la base de données
+ */
+function tcag_page_user_not_found(mysqli $bd): void {
+    ob_end_clean();
+    $str = "Le profil est introuvable";
+    em_aff_debut($str, '../styles/cuiteur.css');
+    em_aff_entete($str);
+    em_aff_infos();
+    mysqli_close($bd);
+
+    em_aff_pied();
+    em_aff_fin();
+    ob_end_flush();
+    exit;
+}
+
+//_______________________________________________________________
+/**
+ * Permet de récuperer l'id de l'utilisateur saisi deans l'url sous forme de pseudo ou d'id
+ * Et retourne l'id de l'utilisateur ainsi que ses informations dans un tableau
+ * 
+ * @param mysqli $bd Object de connexion à la base de données
+ * @return array|false Tableau contenant l'id de l'utilisateur dans la case 0 et ses informations dans la case 1 sinon affiche une page disant que l'utilisateur n'éxiste pas
+ */
+function tcag_get_user_info_or_not_found_user_page(mysqli $bd): ?array {
+    $idUser = tcag_get_user_id_from_url($bd);
+
+    if ($idUser === false){
+        tcag_page_user_not_found($bd);
+    }
+
+    $page_user_info = tcag_get_user_infos_send_req($bd, tcag_get_user_infos_prep_req([$idUser]))[0];
+
+    if (empty($page_user_info)){
+        tcag_page_user_not_found($bd);
+    }
+    return [$idUser, $page_user_info];
 }
 ?>

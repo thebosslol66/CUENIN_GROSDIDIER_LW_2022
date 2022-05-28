@@ -264,6 +264,13 @@ main li.plusBlablas img{
     margin-left: 5px;
 }
 
+ol {
+    list-style-type: inherit;
+}
+ol > li {
+    background-color :inherit;
+}
+
 a {
     color: #3c96f1;
     text-decoration: none;
@@ -396,8 +403,13 @@ h2 + hr {
 --------------------------------------------------------------- */
 
 div.user-infos {
-    margin: 0 0 25px 50px;
+    margin: 0 0 25px 48px;
     padding: 5px 5px 15px 12px;
+}
+
+li div.user-infos {
+    margin-left: 0;
+    padding: 0;
 }
 
 table.user-infos {
@@ -415,4 +427,10 @@ table.user-infos td:first-child {
 table.user-infos tr:not(:last-child) td:last-child {
     display: inline-block;
     vertical-align: middle;
+}
+
+div.first-user {
+    margin: 0 0 10px 25px;
+    padding: 5px 5px 5px 35px;
+    border-radius: 5px;
 }

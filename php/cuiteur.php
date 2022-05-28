@@ -14,52 +14,63 @@ if (! em_est_authentifie()){
 
 $bd = em_bd_connect();
 
-if (isset($_POST['btnPublier'])){
-    if (!isset($_POST['txtMessage']) || empty($_POST['txtMessage'])){
-        //gestion de empty
-    }
-    
-    if (tcag_has_html_tag($_POST['txtMessage'])){
-        //gestion erreur
-    }
-
-    $users_mentioned = get_users_mentionned($_POST['txtMessage']);
-    $tags_mentioned = get_tags_mentionned($_POST['txtMessage']);
-    $text = em_bd_proteger_entree($bd, $_POST['txtMessage']);
-    
-    $date_cuit = date('Ymd');
-    $heure_cuit = date('h:i:s');
-
-    $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`) 
-        VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$text."')";
-    $res = em_bd_send_request($bd, $reqSql);
-    if ($res){
-        $idmess = mysqli_insert_id($bd);
-        $reqSql = "" ;
-        if (count($tags_mentioned)>0){
-            $reqSql .= "INSERT INTO `tags`(`taID`, `taIDBlabla`) VALUES "; 
-            foreach($tags_mentioned as $tag){
-                $reqSql .= "\n ('".$tag."', '".$idmess."'),";
-            }
-            $reqSql = rtrim($reqSql, ",");
-            $reqSql .= ";";
-            $res = em_bd_send_request($bd, $reqSql);
-        }
-        
-        if (count($users_mentioned)>0){
-            $reqSql = "INSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
-            foreach($users_mentioned as $user){
-                $reqSql .= "\n ((SELECT `usID` FROM `users` WHERE `usPseudo` = '".$user."'), '".$idmess."'),";
-            }
-            $reqSql = rtrim($reqSql, ",");
-            $reqSql .= ";";
-            $res = em_bd_send_request($bd, $reqSql);
-        }
-        
-    }
-}
+$error = "";
 
 $prefill_responce = "";
+
+if (isset($_POST['btnPublier'])){
+    if (!isset($_POST['txtMessage']) || empty($_POST['txtMessage'])){
+        $error = "Votre cuit est vide ! Veuillez ecrire un message avant de publier.";
+    }
+    elseif (tcag_has_html_tag($_POST['txtMessage'])){
+        $error =  "Votre cuit contient des balises HTML, veuillez les retirer.";
+        $prefill_responce = $_POST['txtMessage'];
+    }
+    elseif (strlen($_POST['txtMessage']) > LMAX_MESSAGE){
+        $error = "Votre cuit est trop long, veuillez le raccourcir.";
+        $prefill_responce = $_POST['txtMessage'];
+    }
+    else{
+        $users_mentioned = get_users_mentionned($_POST['txtMessage']);
+        $tags_mentioned = get_tags_mentionned($_POST['txtMessage']);
+        $text = em_bd_proteger_entree($bd, $_POST['txtMessage']);
+        
+        $date_cuit = date('Ymd');
+        $heure_cuit = date('H:i:s');
+
+        $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`) 
+            VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".$text."')";
+        $res = em_bd_send_request($bd, $reqSql);
+        if ($res){
+            $idmess = mysqli_insert_id($bd);
+            $reqSql = "" ;
+            if (count($tags_mentioned)>0){
+                $reqSql .= "INSERT INTO `tags`(`taID`, `taIDBlabla`) VALUES "; 
+                foreach($tags_mentioned as $tag){
+                    $reqSql .= "\n ('".$tag."', '".$idmess."'),";
+                }
+                $reqSql = rtrim($reqSql, ",");
+                $reqSql .= ";";
+                $res = em_bd_send_request($bd, $reqSql);
+            }
+            
+            if (count($users_mentioned)>0){
+                $reqSql = "INSERT INTO `mentions`(`meIDUser`, `meIDBlabla`) VALUES "; 
+                foreach($users_mentioned as $user){
+                    $reqSql .= "\n ((SELECT `usID` FROM `users` WHERE `usPseudo` = '".$user."'), '".$idmess."'),";
+                }
+                $reqSql = rtrim($reqSql, ",");
+                $reqSql .= ";";
+                $res = em_bd_send_request($bd, $reqSql);
+            }
+        }
+        else{
+            $error = "Une erreur est survenue lors de l'enregistrement de votre cuit.";
+            $prefill_responce = $_POST['txtMessage'];
+        }
+    }
+    
+}
 
 if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
     if ($_POST['blaction'] == 'delete'){
@@ -103,7 +114,7 @@ if (isset($_POST['blaction']) && isset($_POST["blablaId"])){
             $tags_mentioned = get_tags_mentionned($t["blTexte"]);
             $origAuthor = $t["blIDAutOrig"] ? $t["blIDAutOrig"] : $t["blIDAuteur"];
             $date_cuit = date('Ymd');
-            $heure_cuit = date('h:m:s');
+            $heure_cuit = date('H:i:s');
             $reqSql = "INSERT INTO `blablas`(`blIDAuteur`, `blDate`, `blHeure`, `blTexte`, `blIDAutOrig`) 
                        VALUES ('".$_SESSION['usID']."','".$date_cuit."','".$heure_cuit."','".em_bd_proteger_entree($bd, $t["blTexte"])."', '".$origAuthor."')";
             mysqli_free_result($res);
@@ -195,11 +206,14 @@ ORDER BY blDate DESC, blHeure DESC';
 
 $res = em_bd_send_request($bd, $sql);
 
-
 em_aff_debut('Cuiteur', '../styles/cuiteur.css');
 em_aff_entete(NULL, true, $prefill_responce);
 em_aff_infos();
 echo '<ul>';
+
+if ($error){
+    echo '<li class="error">', $error, "</li>";
+}
 
 if (mysqli_num_rows($res) == 0){
     echo '<li>Votre fil de blablas est vide</li>';

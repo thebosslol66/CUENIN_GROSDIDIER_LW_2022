@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Créer une ligne du tableau de modification des iformations du compte
+ * 
+ * @param string $titre Titre du label du paramètre a modifier
+ * @param string $donnee Valeur du paramètre a modifier du compte
+ */
 function em_genere_ligne_tab (string $titre, string $donnee):void {
     echo    '<tr>',
                 '<td>',
@@ -48,51 +54,16 @@ if (!empty($_POST["btnAbonner"])){
     header('Location: ./cuiteur.php');
 }
 
-if (!empty($_GET["user"]))
-    $idUser = $_GET["user"];
-elseif(!empty($_GET["pseudo"])){
-    $idUser = $_GET["pseudo"];
-    $sql = "SELECT usId FROM `users` WHERE `usPseudo` = '{$_GET["pseudo"]}'";
-    $res = em_bd_send_request($bd, $sql);
-    if (mysqli_num_rows($res) == 1){
-        $idUser = mysqli_fetch_assoc($res)['usId'];
-    }
-    else {
-        $idUser ="";
-    }
-    mysqli_free_result($res);
-}
-else
-    $idUser = "";
-
-if (empty($idUser)){
-    $str = "Le profil est introuvable";
-    em_aff_debut($str, '../styles/cuiteur.css');
-    em_aff_entete($str);
-    em_aff_infos();
-    mysqli_close($bd);
-
-    em_aff_pied();
-    em_aff_fin();
-    ob_end_flush();
-    exit;
-}
+[$idUser, $page_user_info] = tcag_get_user_info_or_not_found_user_page($bd);
 
 $sql = "SELECT 
-                usPseudo,
                 usId,
-                usAvecPhoto,
-                usNom,
                 usWeb,
                 usDateNaissance,
                 usDateInscription,
                 usVille,
                 usBio,
                 usWeb,
-                (SELECT COUNT(blid) FROM blablas WHERE blIDAuteur = {$idUser}) AS nbBlabla,
-                (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$idUser}) AS nbAbos2,
-                (SELECT COUNT(eaIDUser) from estabonne WHERE eaIDAbonne = {$idUser}) AS nbAbos,
-                (SELECT COUNT(*) from mentions WHERE meIDUser = {$idUser}) AS nbMention,
                 (SELECT COUNT(eaIDAbonne) from estabonne WHERE eaIDUser = {$_SESSION["usID"]} AND eaIDAbonne = {$idUser}) AS estAbonne
             FROM users
             WHERE usID = {$idUser} OR usPseudo = {$idUser}";
@@ -100,13 +71,13 @@ $sql = "SELECT
 
 $res = em_bd_send_request($bd, $sql);
 $t = mysqli_fetch_assoc($res);
-$str = "Le profil de {$t['usPseudo']}";
+$str = "Le profil de {$page_user_info['usPseudo']}";
 em_aff_debut($str, '../styles/cuiteur.css');
 em_aff_entete($str);
 em_aff_infos();
 
     echo '<div class="user-infos">';
-    tcag_aff_user_infos($t);
+    tcag_aff_user_infos($page_user_info);
     echo '</div>',
         '<form action="#" method="POST"><table class="user-infos">';
     em_genere_ligne_tab ("Date de naissance", em_amj_clair($t['usDateNaissance']));
@@ -129,9 +100,6 @@ em_aff_infos();
         '</table></form>';
 // libération des ressources
 mysqli_free_result($res);
-
-
-
 
 mysqli_close($bd);
 

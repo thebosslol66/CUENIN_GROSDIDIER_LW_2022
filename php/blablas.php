@@ -14,12 +14,7 @@ if (! em_est_authentifie()){
 }
 $bd = em_bd_connect();
 
-if (empty($_GET["user"]))
-    $idUser = $_SESSION['usID'];
-else
-    $idUser = $_GET["user"];
-
-$page_user_info = tcag_get_user_infos_send_req($bd, tcag_get_user_infos_prep_req([$idUser]))[0];
+[$idUser, $page_user_info] = tcag_get_user_info_or_not_found_user_page($bd);
 
 $sql = "
 (   SELECT 

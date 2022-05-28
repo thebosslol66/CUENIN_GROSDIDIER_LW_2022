@@ -30,7 +30,7 @@ if ($res){
     $all_match = tcag_get_user_infos_send_req($bd, $res);
     tcag_aff_result_list_users($all_match, $_SESSION['usID']);
 } else {
-    echo '<p>Vous n\'avez aucune suggestions</p>';
+    echo '<ul><li>Vous n\'avez aucune suggestions</li></ul>';
 }
 
 mysqli_close($bd);

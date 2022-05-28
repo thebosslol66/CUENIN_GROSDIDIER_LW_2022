@@ -1,10 +1,5 @@
 <?php
 
-function em_genere_ligne_tab (string $titre, string $donnee):void {
-    echo "<tr><td><strong>{$titre} :</strong></td><td>{$donnee}</td></tr>";
-}
-//TODO: gerer si l'id entrée n'existre pas
-
 ob_start(); //démarre la bufferisation
 session_start();
 
@@ -18,42 +13,11 @@ if (! em_est_authentifie()){
 }
 $bd = em_bd_connect();
 
-
-
-if (!empty($_GET["user"]))
-    $idUser = $_GET["user"];
-elseif(!empty($_GET["pseudo"])){
-    $idUser = $_GET["pseudo"];
-    $sql = "SELECT usId FROM `users` WHERE `usPseudo` = '{$_GET["pseudo"]}'";
-    $res = em_bd_send_request($bd, $sql);
-    if (mysqli_num_rows($res) == 1){
-        $idUser = mysqli_fetch_assoc($res)['usId'];
-    }
-    else {
-        $idUser ="";
-    }
-    mysqli_free_result($res);
-}
-else
-    $idUser = "";
-
-if (empty($idUser)){
-    $str = "Le profil est introuvable";
-    em_aff_debut($str, '../styles/cuiteur.css');
-    em_aff_entete($str);
-    em_aff_infos();
-    mysqli_close($bd);
-
-    em_aff_pied();
-    em_aff_fin();
-    ob_end_flush();
-    exit;
-}
+[$idUser, $page_user_info] = tcag_get_user_info_or_not_found_user_page($bd);
 
 tcag_catch_result_list_users_responce($bd);
 
 $all_id_users_infos = [];
-$all_id_users_infos[] = $idUser;
 
 $sql = "SELECT `eaIDUser` 
         FROM `estabonne` 
@@ -66,13 +30,15 @@ while (($t = mysqli_fetch_assoc($result))){
     $all_id_users_infos[] = $t['eaIDUser'];
 }
 
-$all_info_users = tcag_get_user_infos_send_req($bd, tcag_get_user_infos_prep_req($all_id_users_infos));
-$page_user_info = $all_info_users[0];
-array_splice($all_info_users, 0, 1); 
-
-
-// libération des ressources
 mysqli_free_result($result);
+
+if ($all_id_users_infos){
+    $all_info_users = tcag_get_user_infos_send_req($bd, tcag_get_user_infos_prep_req($all_id_users_infos));
+}
+else {
+    $all_info_users = [];
+}
+
 mysqli_close($bd);
 
 

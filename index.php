@@ -85,8 +85,8 @@ function eml_aff_formulaire(array $err): void {
                 '</table>',
             '</form>';
 
-echo 'Pas encore de compte ? <a href="./php/inscription.php">Inscrivez-vous</a> sans INSCRIPTIONtarder !',
-  '<br>Vous hésitze à vous inscrire ? Laissez-vous séduire par une <a href="html/presentation.html">présentation</a> des possibilitées de Cuiteur.';
+echo 'Pas encore de compte ? <a href="./php/inscription.php">Inscrivez-vous</a> sans tarder !',
+  '<br>Vous hésitez à vous inscrire ? Laissez-vous séduire par une <a href="html/presentation.html">présentation</a> des possibilitées de Cuiteur.';
 }
 
 function eml_traitement_inscription(): array {
